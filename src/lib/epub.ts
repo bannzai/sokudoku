@@ -104,8 +104,11 @@ function findPackageDocumentPath(containerXml: string): string | undefined {
   return packageDocumentPath;
 }
 
-/** OPF の spine の順に、本文の XHTML の zip の中のパスを並べる。linear="no" の補助的な文書は除く */
-function listSpineDocumentPaths(packageDocumentPath: string, packageDocumentXml: string): string[] {
+/**
+ * OPF の spine の順に、本文の XHTML の zip の中のパスを並べる。linear="no" の補助的な文書は除く。
+ * manifest に無い idref があれば、章が欠けた EPUB として undefined を返す
+ */
+function listSpineDocumentPaths(packageDocumentPath: string, packageDocumentXml: string): string[] | undefined {
   const manifestHrefs = new Map<string, string>();
   const spineIdrefs: string[] = [];
   forEachXmlElement(packageDocumentXml, (tagName, attributes) => {
@@ -117,13 +120,27 @@ function listSpineDocumentPaths(packageDocumentPath: string, packageDocumentXml:
     }
   });
   const packageDirectory = packageDocumentPath.slice(0, packageDocumentPath.lastIndexOf("/") + 1);
-  return spineIdrefs.flatMap((idref) => {
-    const href = manifestHrefs.get(idref);
-    return href === undefined ? [] : [resolveZipPath(packageDirectory, href)];
-  });
+  const spineHrefs = spineIdrefs.map((idref) => manifestHrefs.get(idref));
+  return spineHrefs.every((href): href is string => href !== undefined)
+    ? spineHrefs.map((href) => resolveZipPath(packageDirectory, href))
+    : undefined;
 }
 
-/** XHTML の本文を、ブロック要素の区切りを改行にした文字列にする */
+/**
+ * EPUB の中の XML・XHTML のバイト列を文字列にする。EPUB は UTF-8 か UTF-16 を許し
+ * ( https://www.w3.org/TR/epub-33/#sec-xml-constraints )、XML は UTF-16 の時に BOM を必須とするため、BOM で UTF-16 を見分ける
+ */
+function decodeXmlBytes(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder("utf-16le").decode(bytes);
+  }
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder("utf-16be").decode(bytes);
+  }
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/** XHTML の本文を、ブロック要素の開始と終了を改行にした文字列にする */
 function extractXhtmlText(xhtml: string): string {
   const textParts: string[] = [];
   let skippedDepth = 0;
@@ -131,8 +148,13 @@ function extractXhtmlText(xhtml: string): string {
   const parser = new Parser(
     {
       onopentag: (tagName) => {
-        if (skippedTagNames.has(localTagName(tagName))) {
+        const name = localTagName(tagName);
+        if (skippedTagNames.has(name)) {
           skippedDepth += 1;
+        }
+        // <div>前<p>後</p></div> の「前」と「後」を連結しないよう、ブロックの開始でも区切る
+        if (blockTagNames.has(name)) {
+          textParts.push("\n");
         }
       },
       ontext: (text) => {
@@ -164,17 +186,17 @@ function extractXhtmlText(xhtml: string): string {
 
 /**
  * EPUB のバイト列から、spine の順に本文の文字列を取り出す。
- * DRM の目印のファイルがある EPUB は本文を返さず drm を返す。zip・EPUB として読めなければ invalid-epub を返す
+ * DRM の目印のファイルがある EPUB は本文を返さず drm を返す。
+ * zip・EPUB として読めない、または spine の章が欠けていれば invalid-epub を返す
  */
 export function extractEpubText(bytes: Uint8Array): ImportResult {
-  const textDecoder = new TextDecoder();
   try {
     const metaInfFiles = unzipFiles(bytes, (path) => path.startsWith("META-INF/"));
     if (Object.keys(metaInfFiles).some((path) => drmMarkerPaths.has(path))) {
       return { ok: false, reason: "drm" };
     }
     const containerXml = metaInfFiles[containerPath];
-    const packageDocumentPath = containerXml && findPackageDocumentPath(textDecoder.decode(containerXml));
+    const packageDocumentPath = containerXml && findPackageDocumentPath(decodeXmlBytes(containerXml));
     if (!packageDocumentPath) {
       return { ok: false, reason: "invalid-epub" };
     }
@@ -182,12 +204,19 @@ export function extractEpubText(bytes: Uint8Array): ImportResult {
     if (packageDocument === undefined) {
       return { ok: false, reason: "invalid-epub" };
     }
-    const spineDocumentPaths = listSpineDocumentPaths(packageDocumentPath, textDecoder.decode(packageDocument));
+    const spineDocumentPaths = listSpineDocumentPaths(packageDocumentPath, decodeXmlBytes(packageDocument));
+    if (spineDocumentPaths === undefined) {
+      return { ok: false, reason: "invalid-epub" };
+    }
     const spineDocuments = unzipFiles(bytes, (path) => spineDocumentPaths.includes(path));
+    // 章が欠けたまま成功にすると、利用者は不完全な本文を全文だと思って読むため失敗にする
+    if (spineDocumentPaths.some((path) => spineDocuments[path] === undefined)) {
+      return { ok: false, reason: "invalid-epub" };
+    }
     return {
       ok: true,
       text: spineDocumentPaths
-        .flatMap((path) => (spineDocuments[path] === undefined ? [] : [extractXhtmlText(textDecoder.decode(spineDocuments[path]))]))
+        .map((path) => extractXhtmlText(decodeXmlBytes(spineDocuments[path])))
         .filter((documentText) => documentText !== "")
         .join("\n"),
     };
