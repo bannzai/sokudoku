@@ -144,7 +144,8 @@ function decodeXmlBytes(bytes: Uint8Array): string {
 function extractXhtmlText(xhtml: string): string {
   const textParts: string[] = [];
   let skippedDepth = 0;
-  // XHTML の実体参照 (&nbsp; など) を読むため HTML として読み、<br/> などの自己終了タグも閉じタグとして扱う
+  // XHTML の実体参照 (&nbsp; など) を読むため HTML として読み、<br/> などの自己終了タグも閉じタグとして扱う。
+  // HTML として読むと CDATA がコメント扱いになり本文が欠けるため、CDATA をテキストとして読む
   const parser = new Parser(
     {
       onopentag: (tagName) => {
@@ -172,7 +173,7 @@ function extractXhtmlText(xhtml: string): string {
         }
       },
     },
-    { recognizeSelfClosing: true },
+    { recognizeSelfClosing: true, recognizeCDATA: true },
   );
   parser.write(xhtml);
   parser.end();

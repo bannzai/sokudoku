@@ -89,6 +89,14 @@ describe("extractEpubText", () => {
     ).toEqual({ ok: true, text: "First\nSecond\nThird\n第二章の本文" });
   });
 
+  it("CDATA で書いた本文を取り込む", () => {
+    expect(
+      extractEpubText(
+        buildEpub({ ...minimalEpubFiles, "OEBPS/text/chapter1.xhtml": xhtmlDocument("<p><![CDATA[CDATA の本文]]></p>") }),
+      ),
+    ).toEqual({ ok: true, text: "CDATA の本文\n第二章の本文" });
+  });
+
   it("BOM の付いた UTF-16 の OPF と XHTML を読む", () => {
     expect(
       extractEpubText(
