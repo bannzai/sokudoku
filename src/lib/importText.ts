@@ -2,7 +2,13 @@ import { isAozoraBunkoText, stripAozoraBunkoNotation } from "./aozoraBunko";
 import { extractEpubText } from "./epub";
 
 /** 本文を取り込めなかった理由 */
-export type ImportFailureReason = "empty" | "drm" | "invalid-epub" | "unsupported-encoding" | "unsupported-file";
+export type ImportFailureReason =
+  | "empty"
+  | "drm"
+  | "invalid-epub"
+  | "unsupported-encoding"
+  | "unsupported-file"
+  | "unreadable-file";
 
 /** 取り込みの結果。成功時の text がリーダー画面へ渡す本文 */
 export type ImportResult = { ok: true; text: string } | { ok: false; reason: ImportFailureReason };
@@ -14,6 +20,7 @@ export const importFailureMessages: Record<ImportFailureReason, string> = {
   "invalid-epub": "EPUB として読み込めませんでした",
   "unsupported-encoding": "文字コードを判定できませんでした (UTF-8 と Shift_JIS に対応)",
   "unsupported-file": "txt と EPUB のファイルだけ読み込めます",
+  "unreadable-file": "ファイルを読み込めませんでした",
 };
 
 // 青空文庫のテキストは Shift_JIS が多く、それ以外のテキストは UTF-8 が大半のため、この 2 つを順に試す

@@ -38,9 +38,15 @@ export function TextImporter({ onImport }: TextImporterProps) {
   async function importSelectedFile(file: File) {
     latestImportRequestIdRef.current += 1;
     const importRequestId = latestImportRequestIdRef.current;
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let importResult: ImportResult;
+    try {
+      importResult = importFile(file.name, new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      // 選んだ後にファイルが変更・削除された時などに、ブラウザがファイルを読めず例外になる
+      importResult = { ok: false, reason: "unreadable-file" };
+    }
     if (importRequestId === latestImportRequestIdRef.current) {
-      handleImportResult(importFile(file.name, bytes));
+      handleImportResult(importResult);
     }
   }
 
