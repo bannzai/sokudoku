@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, useState } from "react";
+import { type DragEvent, useRef, useState } from "react";
 import { type ImportResult, importFailureMessages, importFile, importPlainText } from "@/lib/importText";
 import styles from "./TextImporter.module.css";
 
@@ -15,6 +15,8 @@ export function TextImporter({ onImport }: TextImporterProps) {
   const [pastedText, setPastedText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string>();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  // 取り込み操作ごとに増やす番号。ファイルの読み込みを待つ間に次の操作があった時、古い結果で上書きしないために使う
+  const latestImportRequestIdRef = useRef(0);
 
   /** 取り込みの結果を、成功なら onImport へ渡し、失敗なら理由を表示する */
   function handleImportResult(result: ImportResult) {
@@ -26,9 +28,20 @@ export function TextImporter({ onImport }: TextImporterProps) {
     }
   }
 
-  /** 選んだファイルをブラウザ内で読み、本文を取り出す */
+  /** 貼り付けた本文を取り込む。読み込み中のファイルがあれば、その結果より後の操作として扱う */
+  function importPastedText() {
+    latestImportRequestIdRef.current += 1;
+    handleImportResult(importPlainText(pastedText));
+  }
+
+  /** 選んだファイルをブラウザ内で読み、本文を取り出す。読み込み中に別の取り込み操作があれば、この結果は捨てる */
   async function importSelectedFile(file: File) {
-    handleImportResult(importFile(file.name, new Uint8Array(await file.arrayBuffer())));
+    latestImportRequestIdRef.current += 1;
+    const importRequestId = latestImportRequestIdRef.current;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (importRequestId === latestImportRequestIdRef.current) {
+      handleImportResult(importFile(file.name, bytes));
+    }
   }
 
   /** ドロップしたファイルのうち先頭の 1 つを読む */
@@ -52,7 +65,7 @@ export function TextImporter({ onImport }: TextImporterProps) {
           placeholder="読みたい文章をここに貼り付け"
           rows={8}
         />
-        <button type="button" className={styles.button} onClick={() => handleImportResult(importPlainText(pastedText))}>
+        <button type="button" className={styles.button} onClick={importPastedText}>
           この本文を読む
         </button>
       </section>
