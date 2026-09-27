@@ -144,6 +144,8 @@ function decodeXmlBytes(bytes: Uint8Array): string {
 function extractXhtmlText(xhtml: string): string {
   const textParts: string[] = [];
   let skippedDepth = 0;
+  // pre の中は改行が詩の行などの区切りのため、空白を詰めず改行を残す
+  let preformattedDepth = 0;
   // XHTML の実体参照 (&nbsp; など) を読むため HTML として読み、<br/> などの自己終了タグも閉じタグとして扱う。
   // HTML として読むと CDATA がコメント扱いになり本文が欠けるため、CDATA をテキストとして読む
   const parser = new Parser(
@@ -153,6 +155,9 @@ function extractXhtmlText(xhtml: string): string {
         if (skippedTagNames.has(name)) {
           skippedDepth += 1;
         }
+        if (name === "pre") {
+          preformattedDepth += 1;
+        }
         // <div>前<p>後</p></div> の「前」と「後」を連結しないよう、ブロックの開始でも区切る
         if (blockTagNames.has(name)) {
           textParts.push("\n");
@@ -160,13 +165,16 @@ function extractXhtmlText(xhtml: string): string {
       },
       ontext: (text) => {
         if (skippedDepth === 0) {
-          textParts.push(text.replace(/\s+/g, " "));
+          textParts.push(preformattedDepth > 0 ? text : text.replace(/\s+/g, " "));
         }
       },
       onclosetag: (tagName) => {
         const name = localTagName(tagName);
         if (skippedTagNames.has(name)) {
           skippedDepth -= 1;
+        }
+        if (name === "pre") {
+          preformattedDepth -= 1;
         }
         if (blockTagNames.has(name)) {
           textParts.push("\n");

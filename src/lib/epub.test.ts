@@ -89,6 +89,14 @@ describe("extractEpubText", () => {
     ).toEqual({ ok: true, text: "First\nSecond\nThird\n第二章の本文" });
   });
 
+  it("pre の中の改行を行の区切りとして残す", () => {
+    expect(
+      extractEpubText(
+        buildEpub({ ...minimalEpubFiles, "OEBPS/text/chapter1.xhtml": xhtmlDocument("<pre>第一行\n第二行</pre>") }),
+      ),
+    ).toEqual({ ok: true, text: "第一行\n第二行\n第二章の本文" });
+  });
+
   it("CDATA で書いた本文を取り込む", () => {
     expect(
       extractEpubText(
