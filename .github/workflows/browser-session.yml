@@ -1,0 +1,55 @@
+name: browser-session
+# GitHub Actions runner 上で dev サーバと Chromium を起動し、ローカルの agent-browser から
+# Tailscale 経由で CDP 接続して動作確認・スクリーンショット撮影を行う (webtunnel の caller workflow)。
+# 起動・操作・終了は local/webtunnel CLI (~/.claude/skills/webtunnel) から行う。
+# run-name は local/webtunnel CLI が run を特定するキーのためこの形式を維持する
+run-name: "session=${{ inputs.session }} duration=${{ inputs.duration_minutes }}m"
+on:
+  workflow_dispatch: # fork PR に Secrets を渡さないため workflow_dispatch のみ
+    # session / duration_minutes は local/webtunnel の up が常に送るため宣言必須
+    # (未定義の input を送ると dispatch が拒否される)
+    inputs:
+      session:
+        required: true
+        default: dev
+      duration_minutes:
+        required: true
+        default: "60"
+      start_url:
+        required: false
+        # basePath が /sokudoku のため、dev サーバのルートではなくアプリのトップを開く
+        default: "http://127.0.0.1:3000/sokudoku/"
+      record:
+        required: false
+        default: "true"
+      preview:
+        required: false
+        default: "true"
+      setup_script:
+        required: false
+        default: ".webtunnel/setup.sh"
+      software_webgl:
+        required: false
+        default: "false"
+jobs:
+  session:
+    permissions:
+      id-token: write
+      contents: read
+    uses: bannzai/webtunnel/.github/workflows/session.yml@66a7d244332f605253c86c6ee0851f11980f5f01 # main
+    with:
+      session: ${{ inputs.session }}
+      duration_minutes: ${{ inputs.duration_minutes }}
+      start_url: ${{ inputs.start_url }}
+      record: ${{ inputs.record }}
+      preview: ${{ inputs.preview }}
+      setup_script: ${{ inputs.setup_script }}
+      software_webgl: ${{ inputs.software_webgl }}
+      setup_command: npm ci
+      # 0.0.0.0 で listen すると tailnet へ露出するため loopback に束縛する。PORT は session.yml が渡す
+      start_command: npx next dev -H 127.0.0.1
+      port: "3000"
+      node_version: "24"
+    secrets:
+      TS_OIDC_CLIENT_ID: ${{ secrets.TS_OIDC_CLIENT_ID }}
+      TS_OIDC_AUDIENCE: ${{ secrets.TS_OIDC_AUDIENCE }}
