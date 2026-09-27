@@ -1,6 +1,6 @@
 # AGENTS.md
 
-日本語・英語の文章を 1 語 (日本語は文節) ずつ同じ位置へ表示して速く読む RSVP 速読リーダー。狙い・機能は `documents/PROJECT.md`、技術方針は `documents/adr/0001-static-export-on-github-pages.md`、特許・権利上の制約は `documents/adr/0002-avoid-patented-features-and-drm-import.md` を正とする。
+日本語・英語の文章を 1 語 (日本語は文節) ずつ同じ位置へ表示して速く読む RSVP 速読リーダー。機能は `documents/PROJECT.md`、仮説・判定基準・決めたことは `documents/DIRECTION.md`、技術方針は `documents/adr/0001-static-export-on-github-pages.md`、特許・権利上の制約は `documents/adr/0002-avoid-patented-features-and-drm-import.md` を正とする。
 
 main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ自動配布する。
 
