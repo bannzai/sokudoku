@@ -139,6 +139,16 @@ describe("segmentText", () => {
     expectOffsetsMatchSource(source);
   });
 
+  it("U+2028・U+2029 を段落の区切りにし、その前の本文を落とさない", () => {
+    const source = "前半\u2028後半。\u2029最後";
+    expect(segmentText(source).units.map((unit) => [unit.text, unit.pause])).toEqual([
+      ["前半", "paragraph"],
+      ["後半。", "paragraph"],
+      ["最後", "paragraph"],
+    ]);
+    expectOffsetsMatchSource(source);
+  });
+
   it("サロゲートペアの漢字を壊さずに位置を返す", () => {
     const source = "𠮟られた。";
     expect(segmentText(source).units.map((unit) => unit.text)).toEqual(["𠮟られた。"]);

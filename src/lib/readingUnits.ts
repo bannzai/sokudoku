@@ -71,7 +71,8 @@ function containsJapanese(text: string): boolean {
 export function segmentText(source: string): SegmentedText {
   const sentences: Sentence[] = [];
   const units: ReadingUnit[] = [];
-  for (const paragraph of source.matchAll(/[^\r\n]+/g)) {
+  // U+2028・U+2029 も段落の区切りにする。japaneseSentencePattern の . がこれらに一致せず、前の本文を取りこぼすため
+  for (const paragraph of source.matchAll(/[^\r\n\u2028\u2029]+/g)) {
     const paragraphStart = paragraph.index;
     const paragraphLanguage: Language = containsJapanese(paragraph[0]) ? "ja" : "en";
     const paragraphUnitCount = units.length;
