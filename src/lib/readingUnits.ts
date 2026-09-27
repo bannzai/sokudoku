@@ -119,7 +119,11 @@ function sentenceRanges(paragraph: string, language: Language): [number, number]
   const ranges: [number, number][] = [];
   let sentenceStart = 0;
   for (const word of paragraph.matchAll(/\S+/g)) {
-    if (englishSentenceEndPattern.test(word[0]) && !englishAbbreviations.has(word[0].toLowerCase())) {
+    // 引用文の先頭の略語 (“Dr.) も略語として扱うため、開き引用符・開き括弧を除いて比べる
+    if (
+      englishSentenceEndPattern.test(word[0]) &&
+      !englishAbbreviations.has(word[0].replace(/^["'“‘(\[]+/u, "").toLowerCase())
+    ) {
       ranges.push([sentenceStart, word.index + word[0].length]);
       sentenceStart = word.index + word[0].length;
     }

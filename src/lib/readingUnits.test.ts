@@ -110,6 +110,15 @@ describe("segmentText", () => {
     expectOffsetsMatchSource(source);
   });
 
+  it("引用符・括弧で始まる略語を文末にしない", () => {
+    const source = "“Dr. Smith is here.” (Mr. Brown left.)";
+    const { sentences } = segmentText(source);
+    expect(sentences.map((sentence) => source.slice(sentence.start, sentence.end))).toEqual([
+      "“Dr. Smith is here.”",
+      "(Mr. Brown left.)",
+    ]);
+  });
+
   it("日本語と英語が混在する文章は段落ごとに言語を判定し、日本語の段落の中の英単語は空白で分ける", () => {
     const source = "Next.jsの静的書き出しを GitHub Pages で配信する。\nThis is a pen.";
     const { sentences, units } = segmentText(source);
