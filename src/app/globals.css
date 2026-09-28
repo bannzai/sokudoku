@@ -2,6 +2,9 @@
   --color-background: #ffffff;
   --color-text: #1a1a1a;
   --color-muted: #666666;
+  --color-border: #dddddd;
+  --color-accent: #1d4ed8;
+  --color-on-accent: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -9,6 +12,9 @@
     --color-background: #121212;
     --color-text: #eeeeee;
     --color-muted: #aaaaaa;
+    --color-border: #333333;
+    --color-accent: #8ab4ff;
+    --color-on-accent: #0b1020;
   }
 }
 
