@@ -26,6 +26,11 @@ body {
   line-height: 1.7;
 }
 
+/* ブラウザ既定のリンク色 (濃い青) はダークモードの背景で読めないため、配色に合わせる */
+a {
+  color: var(--color-accent);
+}
+
 main {
   max-width: 720px;
   margin: 0 auto;
