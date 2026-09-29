@@ -4,6 +4,20 @@
 // 冒頭の【テキスト中に現れる記号について】の区切りと、底本情報の書き出し
 const symbolDescriptionHeading = "【テキスト中に現れる記号について】";
 const sourceBookLinePrefix = "底本：";
+// 青空文庫のファイルの末尾に必ず入る「このファイルは、インターネットの図書館、青空文庫 (URL) で作られました」の一部。
+// 行頭の「底本：」だけでは書評などの引用と見分けられず、それ以降の本文を消してしまうため、この文と揃った時だけ底本情報とみなす
+const aozoraBunkoCreditPhrase = "インターネットの図書館、青空文庫";
+
+/**
+ * 青空文庫の底本情報の先頭の行の位置を返し、青空文庫の底本情報が無ければ -1 を返す。
+ * 上下巻などで底本が複数列記されるため、最初の底本の行から末尾までを底本情報とする
+ */
+function findSourceBookFooterStart(lines: string[], searchStart: number): number {
+  const footerStart = lines.findIndex((line, index) => index >= searchStart && line.startsWith(sourceBookLinePrefix));
+  return footerStart !== -1 && lines.slice(footerStart + 1).some((line) => line.includes(aozoraBunkoCreditPhrase))
+    ? footerStart
+    : -1;
+}
 
 /** 青空文庫の冒頭と記号の説明を挟む、ハイフンだけの区切り行かを返す */
 function isSeparatorLine(line: string): boolean {
@@ -31,12 +45,12 @@ function removeInputterNotes(text: string): string {
   return result;
 }
 
-/** 青空文庫の書式 (注記・記号の説明・底本情報) を含むテキストかを返す */
+/** 青空文庫の書式 (注記・記号の説明・青空文庫の作成の文を伴う底本情報) を含むテキストかを返す */
 export function isAozoraBunkoText(text: string): boolean {
   return (
     text.includes(symbolDescriptionHeading) ||
     text.includes("［＃") ||
-    new RegExp(`^${sourceBookLinePrefix}`, "m").test(text)
+    findSourceBookFooterStart(text.split("\n"), 0) !== -1
   );
 }
 
@@ -51,10 +65,7 @@ export function stripAozoraBunkoNotation(text: string): string {
   const headerEnd = headerStart === -1 ? -1 : lines.findIndex((line, index) => index > headerStart && isSeparatorLine(line));
   const hasSymbolDescription =
     headerEnd !== -1 && lines.slice(headerStart, headerEnd).some((line) => line.includes(symbolDescriptionHeading));
-  // 上下巻などで底本が複数列記されるため、最初の底本の行から末尾までを底本情報とする
-  const footerStart = lines.findIndex(
-    (line, index) => index > (hasSymbolDescription ? headerEnd : -1) && line.startsWith(sourceBookLinePrefix),
-  );
+  const footerStart = findSourceBookFooterStart(lines, hasSymbolDescription ? headerEnd + 1 : 0);
   const bodyEnd = footerStart === -1 ? lines.length : footerStart;
 
   return removeInputterNotes(

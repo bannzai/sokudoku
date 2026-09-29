@@ -71,6 +71,13 @@ describe("importPlainText", () => {
     expect(importPlainText("\r\n一行目\r\n二行目\r三行目\n\n")).toEqual({ ok: true, text: "一行目\n二行目\n三行目" });
   });
 
+  it("「底本：」で始まる行を含む貼り付けでも、青空文庫の作成の文が無ければ本文を削らない", () => {
+    expect(importPlainText("書評の本文\n底本：「引用した本」出版社\n感想の続き")).toEqual({
+      ok: true,
+      text: "書評の本文\n底本：「引用した本」出版社\n感想の続き",
+    });
+  });
+
   it("空白だけの貼り付けは空であることを返す", () => {
     expect(importPlainText(" \n　\t")).toEqual({ ok: false, reason: "empty" });
   });

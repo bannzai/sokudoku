@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isAozoraBunkoText, stripAozoraBunkoNotation } from "./aozoraBunko";
 
+// 青空文庫のファイルの末尾にある、作成元を示す文
+const aozoraBunkoCreditLine = "このファイルは、インターネットの図書館、青空文庫（https://www.aozora.gr.jp/）で作られました。";
+
 describe("stripAozoraBunkoNotation", () => {
   it("｜で始まりを示したルビと、｜の無いルビを除く", () => {
     expect(stripAozoraBunkoNotation("吾輩《わがはい》は一番｜獰悪《どうあく》な猫")).toBe("吾輩は一番獰悪な猫");
@@ -19,9 +22,16 @@ describe("stripAozoraBunkoNotation", () => {
   });
 
   it("底本が複数列記された底本情報をすべて除く", () => {
-    expect(stripAozoraBunkoNotation("本文\n\n底本：「上巻」出版社\n　　　1990年発行\n底本：「下巻」出版社\n入力：（入力者名）")).toBe(
-      "本文",
-    );
+    expect(
+      stripAozoraBunkoNotation(
+        `本文\n\n底本：「上巻」出版社\n　　　1990年発行\n底本：「下巻」出版社\n入力：（入力者名）\n${aozoraBunkoCreditLine}`,
+      ),
+    ).toBe("本文");
+  });
+
+  it("青空文庫の作成の文が後に無い「底本：」の行は、それ以降も本文として残す", () => {
+    const text = "書評\n底本：「引用した本」出版社\nこの本の感想の続き";
+    expect(stripAozoraBunkoNotation(text)).toBe(text);
   });
 
   it("題名と著者名を残し、記号の説明と底本情報を除く", () => {
@@ -38,6 +48,7 @@ describe("stripAozoraBunkoNotation", () => {
       "",
       "底本：「底本」出版社",
       "入力：（入力者名）",
+      aozoraBunkoCreditLine,
     ].join("\n");
     expect(stripAozoraBunkoNotation(text)).toBe("題名\n著者\n\n本文");
   });
@@ -48,13 +59,14 @@ describe("stripAozoraBunkoNotation", () => {
 });
 
 describe("isAozoraBunkoText", () => {
-  it("記号の説明・入力者注・底本情報のどれかがあれば青空文庫の書式とみなす", () => {
+  it("記号の説明・入力者注・青空文庫の作成の文を伴う底本情報のどれかがあれば青空文庫の書式とみなす", () => {
     expect(isAozoraBunkoText("【テキスト中に現れる記号について】")).toBe(true);
     expect(isAozoraBunkoText("［＃改ページ］")).toBe(true);
-    expect(isAozoraBunkoText("本文\n底本：「底本」")).toBe(true);
+    expect(isAozoraBunkoText(`本文\n底本：「底本」\n${aozoraBunkoCreditLine}`)).toBe(true);
   });
 
-  it("注記の無いテキストは青空文庫の書式とみなさない", () => {
+  it("注記の無いテキストと、青空文庫の作成の文を伴わない「底本：」の行だけのテキストは青空文庫の書式とみなさない", () => {
     expect(isAozoraBunkoText("吾輩は猫である。名前はまだ無い。")).toBe(false);
+    expect(isAozoraBunkoText("書評\n底本：「引用した本」出版社")).toBe(false);
   });
 });
