@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { TextImporter } from "@/components/TextImporter";
 import type { ReadingSpeed } from "@/lib/displayDuration";
@@ -45,6 +46,10 @@ export function Reader() {
       <main>
         <h1 className={styles.title}>読む本文を選ぶ</h1>
         <TextImporter onImport={(source) => void openText(source)} />
+        <nav className={styles.legalLinks}>
+          <Link href="/terms/">利用規約</Link>
+          <Link href="/privacy/">プライバシーポリシー</Link>
+        </nav>
       </main>
     );
   }
