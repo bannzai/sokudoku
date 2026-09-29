@@ -57,17 +57,28 @@ function buildEpub(files: Record<string, string | Uint8Array>): Uint8Array {
  */
 function declareOriginalSize(zip: Uint8Array, path: string, originalSize: number): Uint8Array {
   const declaredZip = zip.slice();
-  const view = new DataView(declaredZip.buffer);
+  new DataView(declaredZip.buffer).setUint32(findCentralDirectoryEntryOffset(declaredZip, path) + 24, originalSize, true);
+  return declaredZip;
+}
+
+/** zip の central directory で、指定したファイルの名前を同じ長さの別の名前に書き換えた複製を返す。同じパスのエントリが複数ある zip を作る */
+function renameCentralDirectoryEntry(zip: Uint8Array, path: string, newPath: string): Uint8Array {
+  const renamedZip = zip.slice();
+  renamedZip.set(strToU8(newPath), findCentralDirectoryEntryOffset(renamedZip, path) + 46);
+  return renamedZip;
+}
+
+/** zip の central directory で、指定したファイルの file header の先頭の位置を返す */
+function findCentralDirectoryEntryOffset(zip: Uint8Array, path: string): number {
+  const view = new DataView(zip.buffer);
   const pathBytes = strToU8(path);
-  for (let offset = 0; offset + 46 <= declaredZip.length; offset += 1) {
-    const nameLength = view.getUint16(offset + 28, true);
+  for (let offset = 0; offset + 46 <= zip.length; offset += 1) {
     if (
       view.getUint32(offset, true) === 0x02014b50 &&
-      nameLength === pathBytes.length &&
-      pathBytes.every((byte, index) => declaredZip[offset + 46 + index] === byte)
+      view.getUint16(offset + 28, true) === pathBytes.length &&
+      pathBytes.every((byte, index) => zip[offset + 46 + index] === byte)
     ) {
-      view.setUint32(offset + 24, originalSize, true);
-      return declaredZip;
+      return offset;
     }
   }
   throw new Error(`central directory に ${path} が無い`);
@@ -190,11 +201,33 @@ describe("extractEpubText", () => {
     ).toEqual({ ok: false, reason: "too-large" });
   });
 
+  it("同じパスのエントリが複数ある EPUB は、すべてのエントリの展開後の大きさを足して上限を判定する", () => {
+    // 大きさを偽ったエントリの後に同じパスの小さいエントリを置き、後者の大きさだけで上限を判定させようとする zip
+    expect(
+      extractEpubText(
+        renameCentralDirectoryEntry(
+          declareOriginalSize(
+            buildEpub({ ...minimalEpubFiles, "OEBPS/text/chapterX.xhtml": xhtmlDocument("<p>小さい章</p>") }),
+            "OEBPS/text/chapter1.xhtml",
+            0x7fffffff,
+          ),
+          "OEBPS/text/chapterX.xhtml",
+          "OEBPS/text/chapter1.xhtml",
+        ),
+      ),
+    ).toEqual({ ok: false, reason: "too-large" });
+  });
+
   it("本文に使わない META-INF のファイルは、展開後の大きさが上限を超えると宣言されていても展開せずに本文を読む", () => {
-    const epub = buildEpub({ ...minimalEpubFiles, "META-INF/calibre_bookmarks.txt": "しおり" });
-    expect(extractEpubText(declareOriginalSize(epub, "META-INF/calibre_bookmarks.txt", 0x7fffffff))).toEqual(
-      extractEpubText(buildEpub(minimalEpubFiles)),
-    );
+    expect(
+      extractEpubText(
+        declareOriginalSize(
+          buildEpub({ ...minimalEpubFiles, "META-INF/calibre_bookmarks.txt": "しおり" }),
+          "META-INF/calibre_bookmarks.txt",
+          0x7fffffff,
+        ),
+      ),
+    ).toEqual(extractEpubText(buildEpub(minimalEpubFiles)));
   });
 
   it("zip として読めないバイト列は EPUB として読めないことを返す", () => {

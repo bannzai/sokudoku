@@ -64,12 +64,15 @@ function localTagName(tagName: string): string {
   return tagName.slice(tagName.lastIndexOf(":") + 1).toLowerCase();
 }
 
-/** zip の中のファイルのパスと展開後の大きさ (central directory の宣言値) を、展開せずに並べる */
+/**
+ * zip の中のファイルのパスと展開後の大きさ (central directory の宣言値) を、展開せずに並べる。
+ * fflate は同じパスのエントリをすべて展開するため、同じパスが複数あれば大きさを足し合わせる
+ */
 function listZipEntrySizes(bytes: Uint8Array): Map<string, number> {
   const entrySizes = new Map<string, number>();
   unzipSync(bytes, {
     filter: (file) => {
-      entrySizes.set(file.name, file.originalSize);
+      entrySizes.set(file.name, (entrySizes.get(file.name) ?? 0) + file.originalSize);
       return false;
     },
   });
