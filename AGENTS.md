@@ -21,6 +21,7 @@ main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ
 | lint / 型検査 / テスト / ビルド | PR の `ci.yml` の結果で確認する (`make check` と同じコマンド)。ローカルでは CI の失敗を再現・修正する時だけ `make setup` → `make check` を実行する |
 | ブラウザでの動作確認 | webtunnel skill (`~/.claude/skills/webtunnel/SKILL.md`) で、GitHub Actions runner 上の Chromium と dev サーバ (`browser-session.yml`) を開く。`WEBTUNNEL_REPO=bannzai/sokudoku` と `--ref <ブランチ>` で PR のコードを開き、dev サーバの URL は http://127.0.0.1:3000/sokudoku/ 。UI の変更はスクリーンショットを Read して目視確認してから完了報告する (HTTP 200 やビルド成功で表示を判断しない)。ローカルの agent-browser は runner から再現できない時だけ使い、理由を PR に書く |
 | 公開後の確認 | https://bannzai.github.io/sokudoku/ を webtunnel のセッションで開く |
+| 公開後の利用状況の分析 | `/cloudflare-web-analytics-report` (設定は `.claude/cloudflare-web-analytics.json`) で Cloudflare Web Analytics の日別の訪問数・人気ページを読む |
 
 `make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `check` (lint・typecheck・test・build-web)
 
