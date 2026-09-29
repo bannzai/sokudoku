@@ -173,6 +173,7 @@
 }
 
 .days {
+  justify-self: start;
   border-collapse: collapse;
 }
 
