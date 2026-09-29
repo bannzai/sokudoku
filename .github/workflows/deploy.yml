@@ -28,7 +28,11 @@ jobs:
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - run: make setup
+      # Cloudflare Web Analytics の site token は HTML に載る公開値のため、secret ではなく repository variable で渡す。
+      # 配信のビルドだけに渡し、PR の CI (ci.yml) とローカルのビルドには beacon を入れない
       - run: make build-web
+        env:
+          CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
