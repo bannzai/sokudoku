@@ -50,6 +50,29 @@ function buildEpub(files: Record<string, string | Uint8Array>): Uint8Array {
   });
 }
 
+/**
+ * zip の central directory にある、指定したファイルの展開後の大きさの宣言値を書き換えた複製を返す。
+ * 中身は小さいまま、展開後の大きさを偽った zip (zip bomb) を作る。
+ * 書式は ZIP の仕様 (APPNOTE.TXT 4.3.12) の central directory file header で、宣言値は先頭から 24 バイト目・名前の長さは 28 バイト目
+ */
+function declareOriginalSize(zip: Uint8Array, path: string, originalSize: number): Uint8Array {
+  const declaredZip = zip.slice();
+  const view = new DataView(declaredZip.buffer);
+  const pathBytes = strToU8(path);
+  for (let offset = 0; offset + 46 <= declaredZip.length; offset += 1) {
+    const nameLength = view.getUint16(offset + 28, true);
+    if (
+      view.getUint32(offset, true) === 0x02014b50 &&
+      nameLength === pathBytes.length &&
+      pathBytes.every((byte, index) => declaredZip[offset + 46 + index] === byte)
+    ) {
+      view.setUint32(offset + 24, originalSize, true);
+      return declaredZip;
+    }
+  }
+  throw new Error(`central directory に ${path} が無い`);
+}
+
 /** BOM を先頭に付けた UTF-16LE のバイト列を作る */
 function encodeUtf16le(text: string): Uint8Array {
   const bytes = new Uint8Array(2 + text.length * 2);
@@ -152,6 +175,26 @@ describe("extractEpubText", () => {
       ok: false,
       reason: "drm",
     });
+  });
+
+  it("大文字小文字が仕様と違う DRM の目印のファイルがある EPUB も、DRM を理由に返す", () => {
+    expect(extractEpubText(buildEpub({ ...minimalEpubFiles, "META-INF/Encryption.xml": "<encryption/>" }))).toEqual({
+      ok: false,
+      reason: "drm",
+    });
+  });
+
+  it("本文の XHTML の展開後の大きさが上限を超えると宣言された EPUB は、展開せずに大きすぎることを返す", () => {
+    expect(
+      extractEpubText(declareOriginalSize(buildEpub(minimalEpubFiles), "OEBPS/text/chapter1.xhtml", 0x7fffffff)),
+    ).toEqual({ ok: false, reason: "too-large" });
+  });
+
+  it("本文に使わない META-INF のファイルは、展開後の大きさが上限を超えると宣言されていても展開せずに本文を読む", () => {
+    const epub = buildEpub({ ...minimalEpubFiles, "META-INF/calibre_bookmarks.txt": "しおり" });
+    expect(extractEpubText(declareOriginalSize(epub, "META-INF/calibre_bookmarks.txt", 0x7fffffff))).toEqual(
+      extractEpubText(buildEpub(minimalEpubFiles)),
+    );
   });
 
   it("zip として読めないバイト列は EPUB として読めないことを返す", () => {

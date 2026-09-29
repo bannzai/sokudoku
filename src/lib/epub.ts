@@ -4,15 +4,21 @@ import type { ImportResult } from "./importText";
 
 // EPUB の OCF ( https://www.w3.org/TR/epub-33/#sec-container-metainf ) で本文の暗号化・権利情報を置くファイル。
 // どれかがあれば DRM 付きとして読み込まない (documents/adr/0002-avoid-patented-features-and-drm-import.md)。
-// encryption.xml はフォントの難読化だけの EPUB にもあるが、DRM の有無を中身で判定せず一律に読み込まない
-const drmMarkerPaths = new Set([
-  "META-INF/encryption.xml",
-  "META-INF/rights.xml",
-  "META-INF/license.lcpl",
-  "META-INF/sinf.xml",
+// encryption.xml はフォントの難読化だけの EPUB にもあるが、DRM の有無を中身で判定せず一律に読み込まない。
+// 仕様どおりでない大文字小文字の EPUB も見逃さないよう、小文字にしたパスで照合する
+const lowerCaseDrmMarkerPaths = new Set([
+  "meta-inf/encryption.xml",
+  "meta-inf/rights.xml",
+  "meta-inf/license.lcpl",
+  "meta-inf/sinf.xml",
 ]);
 
 const containerPath = "META-INF/container.xml";
+
+// 展開するファイル (container.xml・OPF・spine の XHTML) の展開後の大きさの合計の上限。
+// 長編小説 1 冊でも本文は 50 万字程度で UTF-8 では 1.5 MB、XHTML のマークアップを含めても 10 MB に届かないため、
+// 数倍の余裕を持たせつつ、展開後の大きさを偽った zip (zip bomb) でブラウザのタブのメモリを使い切らない大きさにする
+const maxExtractedBytes = 64 * 1024 * 1024;
 
 // 本文に含めない要素。ルビの読み (rt・rp) は本文の文字の後ろに読みが続いてしまうため除く
 const skippedTagNames = new Set(["head", "script", "style", "rt", "rp"]);
@@ -58,9 +64,29 @@ function localTagName(tagName: string): string {
   return tagName.slice(tagName.lastIndexOf(":") + 1).toLowerCase();
 }
 
-/** zip の中から、パスが条件に合うファイルだけを展開する。画像などを展開しないよう、読むファイルだけに絞る */
-function unzipFiles(bytes: Uint8Array, shouldExtract: (path: string) => boolean): Record<string, Uint8Array> {
-  return unzipSync(bytes, { filter: (file) => shouldExtract(file.name) });
+/** zip の中のファイルのパスと展開後の大きさ (central directory の宣言値) を、展開せずに並べる */
+function listZipEntrySizes(bytes: Uint8Array): Map<string, number> {
+  const entrySizes = new Map<string, number>();
+  unzipSync(bytes, {
+    filter: (file) => {
+      entrySizes.set(file.name, file.originalSize);
+      return false;
+    },
+  });
+  return entrySizes;
+}
+
+/**
+ * 読むファイルの展開後の大きさの合計が上限を超えるかを、展開する前に宣言値で判定する。
+ * fflate は宣言値の大きさの領域に展開し、それを超えて広げないため、宣言値で判定すれば実際の展開量も上限に収まる
+ */
+function exceedsExtractionLimit(entrySizes: Map<string, number>, paths: string[]): boolean {
+  return [...new Set(paths)].reduce((totalBytes, path) => totalBytes + (entrySizes.get(path) ?? 0), 0) > maxExtractedBytes;
+}
+
+/** zip の中から、指定したパスのファイルだけを展開する。画像などを展開しないよう、読むファイルだけに絞る */
+function unzipFiles(bytes: Uint8Array, paths: string[]): Record<string, Uint8Array> {
+  return unzipSync(bytes, { filter: (file) => paths.includes(file.name) });
 }
 
 /** XML を読み、要素ごとに名前 (接頭辞を除く) と属性を onElement に渡す */
@@ -195,21 +221,27 @@ function extractXhtmlText(xhtml: string): string {
 
 /**
  * EPUB のバイト列から、spine の順に本文の文字列を取り出す。
- * DRM の目印のファイルがある EPUB は本文を返さず drm を返す。
+ * DRM の目印のファイルがある EPUB は本文を返さず drm を返す。読むファイルの展開後の大きさが上限を超えれば too-large を返す。
  * zip・EPUB として読めない、または spine の章が欠けていれば invalid-epub を返す
  */
 export function extractEpubText(bytes: Uint8Array): ImportResult {
   try {
-    const metaInfFiles = unzipFiles(bytes, (path) => path.startsWith("META-INF/"));
-    if (Object.keys(metaInfFiles).some((path) => drmMarkerPaths.has(path))) {
+    const entrySizes = listZipEntrySizes(bytes);
+    if ([...entrySizes.keys()].some((path) => lowerCaseDrmMarkerPaths.has(path.toLowerCase()))) {
       return { ok: false, reason: "drm" };
     }
-    const containerXml = metaInfFiles[containerPath];
+    if (exceedsExtractionLimit(entrySizes, [containerPath])) {
+      return { ok: false, reason: "too-large" };
+    }
+    const containerXml = unzipFiles(bytes, [containerPath])[containerPath];
     const packageDocumentPath = containerXml && findPackageDocumentPath(decodeXmlBytes(containerXml));
     if (!packageDocumentPath) {
       return { ok: false, reason: "invalid-epub" };
     }
-    const packageDocument = unzipFiles(bytes, (path) => path === packageDocumentPath)[packageDocumentPath];
+    if (exceedsExtractionLimit(entrySizes, [containerPath, packageDocumentPath])) {
+      return { ok: false, reason: "too-large" };
+    }
+    const packageDocument = unzipFiles(bytes, [packageDocumentPath])[packageDocumentPath];
     if (packageDocument === undefined) {
       return { ok: false, reason: "invalid-epub" };
     }
@@ -217,7 +249,10 @@ export function extractEpubText(bytes: Uint8Array): ImportResult {
     if (spineDocumentPaths === undefined) {
       return { ok: false, reason: "invalid-epub" };
     }
-    const spineDocuments = unzipFiles(bytes, (path) => spineDocumentPaths.includes(path));
+    if (exceedsExtractionLimit(entrySizes, [containerPath, packageDocumentPath, ...spineDocumentPaths])) {
+      return { ok: false, reason: "too-large" };
+    }
+    const spineDocuments = unzipFiles(bytes, spineDocumentPaths);
     // 章が欠けたまま成功にすると、利用者は不完全な本文を全文だと思って読むため失敗にする
     if (spineDocumentPaths.some((path) => spineDocuments[path] === undefined)) {
       return { ok: false, reason: "invalid-epub" };

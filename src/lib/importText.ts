@@ -6,6 +6,7 @@ export type ImportFailureReason =
   | "empty"
   | "drm"
   | "invalid-epub"
+  | "too-large"
   | "unsupported-encoding"
   | "unsupported-file"
   | "unreadable-file";
@@ -18,6 +19,7 @@ export const importFailureMessages: Record<ImportFailureReason, string> = {
   empty: "本文が空です",
   drm: "DRM で保護された EPUB は読み込めません",
   "invalid-epub": "EPUB として読み込めませんでした",
+  "too-large": "EPUB の本文が大きすぎて読み込めません",
   "unsupported-encoding": "文字コードを判定できませんでした (UTF-8 と Shift_JIS に対応)",
   "unsupported-file": "txt と EPUB のファイルだけ読み込めます",
   "unreadable-file": "ファイルを読み込めませんでした",
