@@ -1,0 +1,189 @@
+.title {
+  margin: 0 0 24px;
+  font-size: 1.5rem;
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.button {
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.session {
+  display: grid;
+  gap: 16px;
+}
+
+.progress {
+  display: grid;
+  gap: 4px;
+}
+
+.progressBar {
+  width: 100%;
+}
+
+.progressText {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* 単位はいつも同じ位置に中央揃えで出す。単位の中の特定の文字の色・位置を変えない (ADR 0002) */
+.display {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 32px 16px;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--color-muted);
+  border-radius: 8px;
+}
+
+/* 表示の上下の中央に置く位置の目印 */
+.display::before,
+.display::after {
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  height: 16px;
+  content: "";
+  background: var(--color-muted);
+}
+
+.display::before {
+  top: 16px;
+}
+
+.display::after {
+  bottom: 16px;
+}
+
+.unitText {
+  font-size: 2.5rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.playButton {
+  min-width: 7em;
+  font-weight: bold;
+}
+
+.speeds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: center;
+}
+
+.speed {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.speedValue {
+  min-width: 6.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.keyHelp {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.fullTextSection {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+/* 位置は offsetTop で現在の単位までスクロールするため、この要素を基準にする */
+.fullText {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 50vh;
+  padding: 12px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  cursor: text;
+  border: 1px solid var(--color-muted);
+  border-radius: 4px;
+}
+
+.currentUnit {
+  color: inherit;
+  background: color-mix(in srgb, var(--color-text) 20%, transparent);
+  border-radius: 2px;
+}
+
+.finished {
+  display: grid;
+  gap: 24px;
+}
+
+.finished .title {
+  margin: 0;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.summary dd {
+  margin: 0;
+}
+
+.records {
+  display: grid;
+  gap: 8px;
+}
+
+.days {
+  border-collapse: collapse;
+}
+
+.days th,
+.days td {
+  padding: 4px 12px 4px 0;
+  text-align: left;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
