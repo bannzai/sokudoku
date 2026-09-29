@@ -6,6 +6,7 @@ import {
   moveByUnits,
   pause,
   play,
+  playedMsAt,
   playFrom,
   presentLanguages,
   type ReaderState,
@@ -46,6 +47,28 @@ describe("createReaderState", () => {
     const state = createReaderState({ units: japaneseUnits, unitIndex: 99, speed });
     expect(state.status).toBe("paused");
     expect(state.unitIndex).toBe(4);
+  });
+
+  it("前回の続きから読む時は、前回までの再生時間と読んだ量を引き継いで読了まで足し続ける", () => {
+    const previousReadAmount = { japaneseCharacters: 8, englishWords: 0, japaneseDurationMs: 1300, englishDurationMs: 0 };
+    const resumed = createReaderState({
+      units: japaneseUnits,
+      unitIndex: 2,
+      speed,
+      playedMs: 5000,
+      readAmount: previousReadAmount,
+    });
+    const finished = playToEnd(resumed, 0);
+    expect(finished.playedMs).toBe(5000 + 1800);
+    expect(finished.readAmount.japaneseCharacters).toBe(16);
+  });
+});
+
+describe("playedMsAt", () => {
+  it("再生中は現在の再生区間を足し、停止中は playedMs をそのまま返す", () => {
+    const playing = play(createReaderState({ units: japaneseUnits, unitIndex: 0, speed, playedMs: 1000 }), 2000);
+    expect(playedMsAt(playing, 2500)).toBe(1500);
+    expect(playedMsAt(pause(playing, 3000), 9999)).toBe(2000);
   });
 });
 

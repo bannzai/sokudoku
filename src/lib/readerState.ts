@@ -75,20 +75,30 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/** 停止中の状態を作る。unitIndex は本文の範囲に収める (前回の位置が本文の単位の数を超えていても壊れないように)。 */
+/**
+ * 停止中の状態を作る。unitIndex は本文の範囲に収める (前回の位置が本文の単位の数を超えていても壊れないように)。
+ * 前回の続きから読む時は、前回までの再生時間と読んだ量を渡して引き継ぎ、読了の記録に日をまたいだ分も含める。
+ */
 export function createReaderState(params: {
   units: readonly ReadingUnit[];
   unitIndex: number;
   speed: ReadingSpeed;
+  playedMs?: number;
+  readAmount?: ReadAmount;
 }): ReaderState {
   return {
     units: params.units,
     unitIndex: clamp(params.unitIndex, 0, Math.max(params.units.length - 1, 0)),
     status: "paused",
     speed: params.speed,
-    playedMs: 0,
-    readAmount: emptyReadAmount,
+    playedMs: params.playedMs ?? 0,
+    readAmount: params.readAmount ?? emptyReadAmount,
   };
+}
+
+/** 指定した時刻までに再生していた時間の合計 (ミリ秒) を返す。再生中なら現在の再生区間も含める。読書位置の保存に使う。 */
+export function playedMsAt(state: ReaderState, now: number): number {
+  return state.playedMs + (state.playingSince === undefined ? 0 : now - state.playingSince);
 }
 
 /** 現在位置から再生を始める。再生中・読了後・単位が無い時は何もしない。 */
@@ -107,7 +117,7 @@ export function pause(state: ReaderState, now: number): ReaderState {
   return {
     ...state,
     status: "paused",
-    playedMs: state.playedMs + (now - state.playingSince),
+    playedMs: playedMsAt(state, now),
     playingSince: undefined,
   };
 }
@@ -143,7 +153,7 @@ export function advance(state: ReaderState, now: number): ReaderState {
     return {
       ...state,
       status: "finished",
-      playedMs: state.playedMs + (now - state.playingSince),
+      playedMs: playedMsAt(state, now),
       playingSince: undefined,
       readAmount,
       finishedAt: now,
@@ -217,7 +227,7 @@ export function stepSpeed(state: ReaderState, languages: readonly Language[], st
   return { ...state, speed };
 }
 
-/** 先頭から読み直すため、読んだ量と再生した時間を捨てた停止中の状態に戻す。 */
+/** 先頭から読み直すため、読んだ量と再生した時間を捨てた停止中の状態に戻す (前の読了は記録済みのため)。 */
 export function restart(state: ReaderState): ReaderState {
   return createReaderState({ units: state.units, unitIndex: 0, speed: state.speed });
 }

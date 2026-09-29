@@ -7,7 +7,8 @@ import {
   parseFinishedReadings,
   parseReadingPositions,
   parseReadingSpeed,
-  resumableUnitIndex,
+  type ReadingPosition,
+  resumablePosition,
   summarizeFinishedReadings,
   upsertReadingPosition,
 } from "./readerStorage";
@@ -28,40 +29,46 @@ describe("parseReadingSpeed", () => {
   });
 });
 
+const readAmount = { japaneseCharacters: 120, englishWords: 0, japaneseDurationMs: 12_000, englishDurationMs: 0 };
+
+/** テスト用の読書位置を作る。 */
+function readingPosition(unitIndex: number, unitCount: number, savedAt: number): ReadingPosition {
+  return { unitIndex, unitCount, savedAt, playedMs: 15_000, readAmount };
+}
+
 describe("読書位置", () => {
   it("形の合わない項目を捨てて読む", () => {
     expect(
       parseReadingPositions(
         JSON.stringify({
-          good: { unitIndex: 3, unitCount: 10, savedAt: 1 },
-          negative: { unitIndex: -1, unitCount: 10, savedAt: 1 },
+          good: readingPosition(3, 10, 1),
+          negative: readingPosition(-1, 10, 1),
           missing: { unitIndex: 3 },
+          missingReadAmount: { ...readingPosition(3, 10, 1), readAmount: undefined },
           broken: null,
         }),
       ),
-    ).toEqual({ good: { unitIndex: 3, unitCount: 10, savedAt: 1 } });
+    ).toEqual({ good: readingPosition(3, 10, 1) });
     expect(parseReadingPositions("[")).toEqual({});
   });
 
   it("書き込むと同じハッシュの位置を上書きし、100 件を超えたら保存が古いものから捨てる", () => {
     const positions = Object.fromEntries(
-      Array.from({ length: 100 }, (_, index) => [`hash${index}`, { unitIndex: 0, unitCount: 1, savedAt: index }]),
+      Array.from({ length: 100 }, (_, index) => [`hash${index}`, readingPosition(0, 1, index)]),
     );
-    const updatedPositions = upsertReadingPosition(positions, "new", { unitIndex: 5, unitCount: 9, savedAt: 1000 });
+    const updatedPositions = upsertReadingPosition(positions, "new", readingPosition(5, 9, 1000));
     expect(Object.keys(updatedPositions)).toHaveLength(100);
-    expect(updatedPositions.new).toEqual({ unitIndex: 5, unitCount: 9, savedAt: 1000 });
+    expect(updatedPositions.new).toEqual(readingPosition(5, 9, 1000));
     expect(updatedPositions.hash0).toBeUndefined();
-    expect(upsertReadingPosition(updatedPositions, "new", { unitIndex: 6, unitCount: 9, savedAt: 1001 }).new).toEqual({
-      unitIndex: 6,
-      unitCount: 9,
-      savedAt: 1001,
-    });
+    expect(upsertReadingPosition(updatedPositions, "new", readingPosition(6, 9, 1001)).new).toEqual(
+      readingPosition(6, 9, 1001),
+    );
   });
 
-  it("単位の数が合う時だけ続きの位置を返す", () => {
-    expect(resumableUnitIndex({ unitIndex: 3, unitCount: 10, savedAt: 0 }, 10)).toBe(3);
-    expect(resumableUnitIndex({ unitIndex: 3, unitCount: 10, savedAt: 0 }, 11)).toBeUndefined();
-    expect(resumableUnitIndex(undefined, 10)).toBeUndefined();
+  it("単位の数が合う時だけ続きの位置を、再生時間と読んだ量と一緒に返す", () => {
+    expect(resumablePosition(readingPosition(3, 10, 0), 10)).toEqual(readingPosition(3, 10, 0));
+    expect(resumablePosition(readingPosition(3, 10, 0), 11)).toBeUndefined();
+    expect(resumablePosition(undefined, 10)).toBeUndefined();
   });
 });
 

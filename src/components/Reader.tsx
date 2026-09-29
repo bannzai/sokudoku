@@ -4,7 +4,7 @@ import { useState } from "react";
 import { TextImporter } from "@/components/TextImporter";
 import type { ReadingSpeed } from "@/lib/displayDuration";
 import { defaultReadingSpeed } from "@/lib/readerState";
-import { hashText, loadReadingPosition, loadReadingSpeed } from "@/lib/readerStorage";
+import { hashText, loadReadingPosition, loadReadingSpeed, type ReadingPosition } from "@/lib/readerStorage";
 import { type SegmentedText, segmentText } from "@/lib/readingUnits";
 import { ReadingSession } from "./ReadingSession";
 import styles from "./Reader.module.css";
@@ -17,8 +17,8 @@ type OpenedText = {
   segmentedText: SegmentedText;
   /** 本文のハッシュ。読書位置の保存のキーにする。 */
   textHash: string;
-  /** 前回の続きの位置。保存が無ければ先頭。 */
-  startUnitIndex: number;
+  /** 前回の続きの位置と、そこまでの再生時間・読んだ量。保存が無ければ undefined で、先頭から読む。 */
+  resumedPosition?: ReadingPosition;
   /** 保存した速度。保存が無ければ初期値。 */
   speed: ReadingSpeed;
 };
@@ -35,7 +35,7 @@ export function Reader() {
       source,
       segmentedText,
       textHash,
-      startUnitIndex: loadReadingPosition(textHash, segmentedText.units.length) ?? 0,
+      resumedPosition: loadReadingPosition(textHash, segmentedText.units.length),
       speed: loadReadingSpeed() ?? defaultReadingSpeed,
     });
   }
@@ -54,7 +54,7 @@ export function Reader() {
       source={openedText.source}
       units={openedText.segmentedText.units}
       textHash={openedText.textHash}
-      startUnitIndex={openedText.startUnitIndex}
+      resumedPosition={openedText.resumedPosition}
       initialSpeed={openedText.speed}
       onClose={() => setOpenedText(undefined)}
     />

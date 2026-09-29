@@ -7,6 +7,8 @@ import {
   createReaderState,
   moveBySentence,
   moveByUnits,
+  pause,
+  playedMsAt,
   playFrom,
   presentLanguages,
   type ReaderState,
@@ -24,6 +26,7 @@ import {
   clearReadingPosition,
   type FinishedReading,
   type FinishedReadingTotal,
+  type ReadingPosition,
   recordFinishedReading,
   saveReadingPosition,
   saveReadingSpeed,
@@ -40,8 +43,8 @@ type ReadingSessionProps = {
   units: readonly ReadingUnit[];
   /** 本文のハッシュ。読書位置の保存のキーにする。 */
   textHash: string;
-  /** 再生を始める単位の添字 (前回の続き)。 */
-  startUnitIndex: number;
+  /** 前回の続きの位置と、そこまでの再生時間・読んだ量。undefined なら先頭から読む。 */
+  resumedPosition?: ReadingPosition;
   /** 再生を始める時の速度。 */
   initialSpeed: ReadingSpeed;
   /** 取り込みの画面へ戻る。 */
@@ -233,9 +236,15 @@ function FinishedScreen({ readerState, finishedReadings, onRestart, onClose }: F
  * 再生の画面。単位を 1 つずつ画面中央に中央揃えで出し、停止中だけ全文と現在位置のハイライトを出す。
  * 再生中に全文を出さない・単位の中の文字の見た目を変えない・表示のクリックは一時停止と再開だけに使う (ADR 0002)。
  */
-export function ReadingSession({ source, units, textHash, startUnitIndex, initialSpeed, onClose }: ReadingSessionProps) {
+export function ReadingSession({ source, units, textHash, resumedPosition, initialSpeed, onClose }: ReadingSessionProps) {
   const [readerState, setReaderState] = useState(() =>
-    createReaderState({ units, unitIndex: startUnitIndex, speed: initialSpeed }),
+    createReaderState({
+      units,
+      unitIndex: resumedPosition?.unitIndex ?? 0,
+      speed: initialSpeed,
+      playedMs: resumedPosition?.playedMs,
+      readAmount: resumedPosition?.readAmount,
+    }),
   );
   const [finishedReadings, setFinishedReadings] = useState<FinishedReading[]>([]);
   const languages = useMemo(() => presentLanguages(units), [units]);
@@ -272,11 +281,31 @@ export function ReadingSession({ source, units, textHash, startUnitIndex, initia
     saveReadingSpeed(readerState.speed);
   }, [readerState.speed]);
 
+  // 再生・停止・移動・単位の表示のたびに保存し、再生中にページを閉じても続きと読んだ量が残るようにする
   useEffect(() => {
     if (readerState.status !== "finished") {
-      saveReadingPosition(textHash, { unitIndex: readerState.unitIndex, unitCount: units.length, savedAt: Date.now() });
+      const now = Date.now();
+      saveReadingPosition(textHash, {
+        unitIndex: readerState.unitIndex,
+        unitCount: units.length,
+        savedAt: now,
+        playedMs: playedMsAt(readerState, now),
+        readAmount: readerState.readAmount,
+      });
     }
-  }, [readerState.status, readerState.unitIndex, textHash, units.length]);
+  }, [readerState, textHash, units.length]);
+
+  // 別のタブへ移る・端末をロックする等で画面が見えなくなったら止め、見ていない単位を読んだことにしない
+  useEffect(() => {
+    /** 画面が見えなくなった時に再生を止める。 */
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        setReaderState(pause(readerState, Date.now()));
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [readerState]);
 
   useEffect(() => {
     /** 画面のボタンと同じ操作を、キーボードからも行えるようにする。 */

@@ -1,10 +1,11 @@
 import type { ReadingSpeed } from "./displayDuration";
-import { speedLimits } from "./readerState";
+import { type ReaderState, speedLimits } from "./readerState";
 
-/** 本文ごとの読書位置。本文そのものは保存せず、本文のハッシュをキーにする。 */
-export type ReadingPosition = {
-  /** 次に表示する単位の添字。 */
-  unitIndex: number;
+/**
+ * 本文ごとの読書位置と、そこまでの再生時間・読んだ量。本文そのものは保存せず、本文のハッシュをキーにする。
+ * 再生時間と読んだ量も残すのは、日をまたいで読み終えた本の読了の記録に、前回までに読んだ分も含めるため。
+ */
+export type ReadingPosition = Pick<ReaderState, "unitIndex" | "playedMs" | "readAmount"> & {
   /** 保存した時の単位の数。分割の方式が変わって単位の数が変わった本文では、位置を使わない。 */
   unitCount: number;
   /** 保存した時刻 (エポックミリ秒)。保存数の上限を超えた時に古いものから捨てるのに使う。 */
@@ -96,8 +97,19 @@ export function parseReadingPositions(json: string | null): ReadingPositions {
   }
   return Object.fromEntries(
     Object.entries(value).filter(([, position]) => {
-      const { unitIndex, unitCount, savedAt } = (position ?? {}) as Record<string, unknown>;
-      return isNonNegativeInteger(unitIndex) && isNonNegativeInteger(unitCount) && isNonNegativeInteger(savedAt);
+      const { unitIndex, unitCount, savedAt, playedMs, readAmount } = (position ?? {}) as Record<string, unknown>;
+      const { japaneseCharacters, englishWords, japaneseDurationMs, englishDurationMs } = (readAmount ??
+        {}) as Record<string, unknown>;
+      return [
+        unitIndex,
+        unitCount,
+        savedAt,
+        playedMs,
+        japaneseCharacters,
+        englishWords,
+        japaneseDurationMs,
+        englishDurationMs,
+      ].every(isNonNegativeInteger);
     }),
   ) as ReadingPositions;
 }
@@ -128,9 +140,12 @@ export function upsertReadingPosition(
 }
 
 /** 保存した位置が、今の本文の単位の数と合う時だけ位置を返す。 */
-export function resumableUnitIndex(position: ReadingPosition | undefined, unitCount: number): number | undefined {
+export function resumablePosition(
+  position: ReadingPosition | undefined,
+  unitCount: number,
+): ReadingPosition | undefined {
   return position !== undefined && position.unitCount === unitCount && position.unitIndex < unitCount
-    ? position.unitIndex
+    ? position
     : undefined;
 }
 
@@ -217,9 +232,9 @@ export function saveReadingSpeed(speed: ReadingSpeed) {
   writeStorage(storageKeys.readingSpeed, JSON.stringify(speed));
 }
 
-/** 本文のハッシュと単位の数から、続きから読む単位の添字を読む。 */
-export function loadReadingPosition(textHash: string, unitCount: number): number | undefined {
-  return resumableUnitIndex(parseReadingPositions(readStorage(storageKeys.readingPositions))[textHash], unitCount);
+/** 本文のハッシュと単位の数から、続きから読む位置を読む。 */
+export function loadReadingPosition(textHash: string, unitCount: number): ReadingPosition | undefined {
+  return resumablePosition(parseReadingPositions(readStorage(storageKeys.readingPositions))[textHash], unitCount);
 }
 
 /** 本文の読書位置を保存する。 */
