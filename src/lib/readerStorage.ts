@@ -48,7 +48,7 @@ export type FinishedReadingSummary = {
 /**
  * 英文を読んだ日ごとの、訳を出した回数。キーは端末の時刻帯の YYYY-MM-DD。
  * documents/DIRECTION.md の判定基準「訳の表示を使った日の割合 (英文を読んだ日のうち)」を判定日に確かめるために残す。
- * 英語の単位を表示し終えた日と、英文で訳を出した日にキーを作るため、キーのある日が「英文を読んだ日」になる。
+ * 英語の単位を表示し終えた日と、英文を含む本文で訳を出した日にキーを作るため、キーのある日が「英文を読んだ日」になる。
  */
 export type EnglishReadingDays = Record<string, { translationDisplayCount: number }>;
 

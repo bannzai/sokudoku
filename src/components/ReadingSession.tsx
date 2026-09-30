@@ -47,7 +47,6 @@ import {
   canToggleTranslation,
   initialTranslationState,
   startsCreatingTranslator,
-  startsShowingTranslation,
   toggleTranslation,
   type TranslationState,
 } from "@/lib/translationState";
@@ -345,6 +344,7 @@ export function ReadingSession({
   const remainingDurations = useMemo(() => remainingDurationsMs(units, readerState.speed), [units, readerState.speed]);
   const hasEnglish = languages.includes("en");
   const currentSentenceIndex = units[readerState.unitIndex].sentenceIndex;
+  const isTranslationShown = translationState.visible && translationState.translatorStatus === "ready";
 
   // 英文を含む本文では、翻訳器を作れるかを先に確かめ、切り替えボタンを有効にするか・理由を出すかを決める
   useEffect(() => {
@@ -369,8 +369,7 @@ export function ReadingSession({
     const translator = translatorRef.current;
     const sentence = sentences[currentSentenceIndex];
     if (
-      !translationState.visible ||
-      translationState.translatorStatus !== "ready" ||
+      !isTranslationShown ||
       translator === undefined ||
       sentence.language !== "en" ||
       currentSentenceIndex in sentenceTranslations ||
@@ -386,19 +385,16 @@ export function ReadingSession({
         () => setSentenceTranslations((translations) => ({ ...translations, [currentSentenceIndex]: null })),
       )
       .finally(() => translatingSentenceIndexesRef.current.delete(currentSentenceIndex));
-  }, [
-    currentSentenceIndex,
-    sentenceTranslations,
-    sentences,
-    source,
-    translationState.translatorStatus,
-    translationState.visible,
-  ]);
+  }, [currentSentenceIndex, isTranslationShown, sentenceTranslations, sentences, source]);
 
-  /**
-   * 訳の表示と非表示を切り替える。翻訳器の作成にユーザー操作が要るため、ボタン・T キーのイベントの中から呼ぶ。
-   * 英文で訳を出した時は、その日の訳を出した回数を記録する。
-   */
+  // 訳が出る状態 (翻訳器を作り終えて表示中) に変わるたびに、その日の訳を出した回数を記録する。翻訳器を作れなかった操作は数えない
+  useEffect(() => {
+    if (isTranslationShown) {
+      recordTranslationDisplay(Date.now());
+    }
+  }, [isTranslationShown]);
+
+  /** 訳の表示と非表示を切り替える。翻訳器の作成にユーザー操作が要るため、ボタン・T キーのイベントの中から呼ぶ。 */
   const toggleTranslationDisplay = useCallback(() => {
     const nextTranslationState = toggleTranslation(translationState);
     setTranslationState(nextTranslationState);
@@ -411,13 +407,7 @@ export function ReadingSession({
         () => setTranslationState(applyTranslatorCreationFailed),
       );
     }
-    if (
-      startsShowingTranslation(translationState, nextTranslationState) &&
-      sentences[currentSentenceIndex].language === "en"
-    ) {
-      recordTranslationDisplay(Date.now());
-    }
-  }, [currentSentenceIndex, sentences, translationState]);
+  }, [translationState]);
 
   // 表示中の単位の表示時間が経ったら次へ進む。状態が変わるたびに (移動・速度変更を含む) 表示時間を測り直す
   useEffect(() => {
@@ -558,9 +548,8 @@ export function ReadingSession({
       {hasEnglish && (
         // 単位の表示の外 (下) に今の文の訳だけを出す。原文の文と訳を対にして並べない (ADR 0002)
         <p className={styles.translation} lang="ja" aria-live="polite">
-          {translationState.visible &&
+          {isTranslationShown &&
             sentences[currentSentenceIndex].language === "en" &&
-            translationState.translatorStatus === "ready" &&
             (currentSentenceTranslation === undefined
               ? "訳しています"
               : (currentSentenceTranslation ?? "この文は訳せませんでした"))}

@@ -7,7 +7,6 @@ import {
   canToggleTranslation,
   initialTranslationState,
   startsCreatingTranslator,
-  startsShowingTranslation,
   toggleTranslation,
   type TranslationState,
 } from "./translationState";
@@ -53,7 +52,6 @@ describe("訳の表示の切り替え", () => {
       const next = toggleTranslation(previous);
       expect(next).toEqual({ translatorStatus: "creating", visible: true });
       expect(startsCreatingTranslator(previous, next)).toBe(true);
-      expect(startsShowingTranslation(previous, next)).toBe(true);
     }
   });
 
@@ -62,14 +60,13 @@ describe("訳の表示の切り替え", () => {
     const hidden = toggleTranslation(creating);
     expect(hidden).toEqual({ translatorStatus: "creating", downloadProgress: 0.5, visible: false });
     expect(startsCreatingTranslator(creating, hidden)).toBe(false);
-    expect(startsShowingTranslation(hidden, toggleTranslation(hidden))).toBe(true);
+    expect(toggleTranslation(hidden)).toEqual(creating);
   });
 
   it("作り終えた後は表示と非表示を切り替え、翻訳器を作り直さない", () => {
     const shown: TranslationState = { translatorStatus: "ready", visible: true };
     const hidden = toggleTranslation(shown);
     expect(hidden).toEqual({ translatorStatus: "ready", visible: false });
-    expect(startsShowingTranslation(shown, hidden)).toBe(false);
     expect(toggleTranslation(hidden)).toEqual(shown);
     expect(startsCreatingTranslator(hidden, toggleTranslation(hidden))).toBe(false);
   });

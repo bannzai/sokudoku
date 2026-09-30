@@ -67,11 +67,6 @@ export function startsCreatingTranslator(previous: TranslationState, next: Trans
   return previous.translatorStatus !== "creating" && next.translatorStatus === "creating";
 }
 
-/** 状態の変化が、訳を出す変化 (非表示から表示) かを返す。訳を出した回数の記録に使う。 */
-export function startsShowingTranslation(previous: TranslationState, next: TranslationState): boolean {
-  return !previous.visible && next.visible;
-}
-
 /** 言語モデルのダウンロードの進み具合 (0〜1) を反映する。翻訳器を作っている間だけ反映する。 */
 export function applyDownloadProgress(state: TranslationState, loaded: number): TranslationState {
   if (state.translatorStatus !== "creating") {
