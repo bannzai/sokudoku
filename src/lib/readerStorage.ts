@@ -45,11 +45,38 @@ export type FinishedReadingSummary = {
   days: (FinishedReadingTotal & { date: string })[];
 };
 
+/**
+ * 日ごとの、英文を読んだかと訳を出した回数。キーは端末の時刻帯の YYYY-MM-DD。
+ * documents/DIRECTION.md の判定基準「訳の表示を使った日の割合 (英文を読んだ日のうち)」を判定日に確かめるために残す。
+ */
+export type EnglishReadingDays = Record<
+  string,
+  {
+    /** その日に英語の単位を表示し終えたか。真の日が「英文を読んだ日」。 */
+    englishRead: boolean;
+    /** その日に訳を出した回数。 */
+    translationDisplayCount: number;
+  }
+>;
+
+/** 英文を読んだ日と訳を出した回数の集計。 */
+export type EnglishReadingDaysSummary = {
+  /** 今日を含む直近 7 日のうち、英文を読んだ日数。 */
+  lastSevenDaysEnglishReadingDayCount: number;
+  /** 今日を含む直近 7 日の英文を読んだ日のうち、訳を 1 回以上出した日数。 */
+  lastSevenDaysTranslationDisplayDayCount: number;
+  /** 英文を読んだ日ごとの訳を出した回数を、新しい日から並べたもの。 */
+  days: { date: string; translationDisplayCount: number }[];
+};
+
 const storageKeys = {
   readingSpeed: "sokudoku:reading-speed",
   readingPositions: "sokudoku:reading-positions",
   finishedReadings: "sokudoku:finished-readings",
+  englishReadingDays: "sokudoku:english-reading-days",
 };
+
+const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 
 // 読みかけの本文を同時に持つ数として十分な数。1 件は 100 バイトほどで、localStorage の容量 (5MB 前後) を圧迫しない
 const maxReadingPositionCount = 100;
@@ -126,6 +153,38 @@ export function parseFinishedReadings(json: string | null): FinishedReading[] {
   }) as FinishedReading[];
 }
 
+/** 保存した英文を読んだ日の記録を読む。日付の形でないキーと、形の合わない項目は捨てる。 */
+export function parseEnglishReadingDays(json: string | null): EnglishReadingDays {
+  const value = parseJson(json);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([date, day]) => {
+      const { englishRead, translationDisplayCount } = (day ?? {}) as Record<string, unknown>;
+      return dateKeyPattern.test(date) && typeof englishRead === "boolean" && isNonNegativeInteger(translationDisplayCount);
+    }),
+  ) as EnglishReadingDays;
+}
+
+/** 指定した時刻の日を、英文を読んだ日にした記録を返す。その日の訳を出した回数は変えない。 */
+export function addEnglishReadingDay(days: EnglishReadingDays, now: number): EnglishReadingDays {
+  const date = localDateKey(now);
+  return { ...days, [date]: { englishRead: true, translationDisplayCount: days[date]?.translationDisplayCount ?? 0 } };
+}
+
+/** 指定した時刻の日の、訳を出した回数を 1 つ増やした記録を返す。英文を読んだ日かは変えない。 */
+export function addTranslationDisplay(days: EnglishReadingDays, now: number): EnglishReadingDays {
+  const date = localDateKey(now);
+  return {
+    ...days,
+    [date]: {
+      englishRead: days[date]?.englishRead ?? false,
+      translationDisplayCount: (days[date]?.translationDisplayCount ?? 0) + 1,
+    },
+  };
+}
+
 /** 本文の読書位置を書き込んだ対応を返す。上限を超えたら保存が古いものから捨てる。 */
 export function upsertReadingPosition(
   positions: ReadingPositions,
@@ -164,6 +223,31 @@ export function localDateKey(epochMs: number): string {
     .join("-");
 }
 
+/** 今日を含む直近 7 日の、端末の時刻帯の YYYY-MM-DD を返す。判定基準が週あたりの量・割合のため。 */
+function lastSevenDateKeys(now: number): Set<string> {
+  const today = new Date(now);
+  return new Set(
+    Array.from({ length: 7 }, (_, dayOffset) =>
+      localDateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOffset).getTime()),
+    ),
+  );
+}
+
+/** 英文を読んだ日の記録を、直近 7 日の日数と日ごとの訳を出した回数にまとめる。英文を読んでいない日は除く。 */
+export function summarizeEnglishReadingDays(days: EnglishReadingDays, now: number): EnglishReadingDaysSummary {
+  const lastSevenDates = lastSevenDateKeys(now);
+  const sortedDays = Object.entries(days)
+    .filter(([, day]) => day.englishRead)
+    .map(([date, day]) => ({ date, translationDisplayCount: day.translationDisplayCount }))
+    .sort((left, right) => right.date.localeCompare(left.date));
+  const lastSevenDays = sortedDays.filter((day) => lastSevenDates.has(day.date));
+  return {
+    lastSevenDaysEnglishReadingDayCount: lastSevenDays.length,
+    lastSevenDaysTranslationDisplayDayCount: lastSevenDays.filter((day) => day.translationDisplayCount > 0).length,
+    days: sortedDays,
+  };
+}
+
 /** 読了の記録を、日ごと・直近 7 日・全期間で合計する。 */
 export function summarizeFinishedReadings(records: readonly FinishedReading[], now: number): FinishedReadingSummary {
   const dayTotals = new Map<string, FinishedReadingTotal>();
@@ -175,12 +259,7 @@ export function summarizeFinishedReadings(records: readonly FinishedReading[], n
       englishWords: dayTotal.englishWords + record.englishWords,
     });
   }
-  const today = new Date(now);
-  const lastSevenDates = new Set(
-    Array.from({ length: 7 }, (_, dayOffset) =>
-      localDateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOffset).getTime()),
-    ),
-  );
+  const lastSevenDates = lastSevenDateKeys(now);
   const days = [...dayTotals.entries()]
     .map(([date, dayTotal]) => ({ date, ...dayTotal }))
     .sort((left, right) => right.date.localeCompare(left.date));
@@ -259,4 +338,19 @@ export function recordFinishedReading(record: FinishedReading): FinishedReading[
   const records = addFinishedReading(parseFinishedReadings(readStorage(storageKeys.finishedReadings)), record);
   writeStorage(storageKeys.finishedReadings, JSON.stringify(records));
   return records;
+}
+
+/** 英文を読んだ日の記録を読む。 */
+export function loadEnglishReadingDays(): EnglishReadingDays {
+  return parseEnglishReadingDays(readStorage(storageKeys.englishReadingDays));
+}
+
+/** 指定した時刻の日を、英文を読んだ日として保存する。 */
+export function recordEnglishReadingDay(now: number) {
+  writeStorage(storageKeys.englishReadingDays, JSON.stringify(addEnglishReadingDay(loadEnglishReadingDays(), now)));
+}
+
+/** 指定した時刻の日の、訳を出した回数を 1 つ増やして保存する。 */
+export function recordTranslationDisplay(now: number) {
+  writeStorage(storageKeys.englishReadingDays, JSON.stringify(addTranslationDisplay(loadEnglishReadingDays(), now)));
 }

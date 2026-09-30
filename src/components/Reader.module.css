@@ -90,6 +90,22 @@
   overflow-wrap: anywhere;
 }
 
+/* 訳は単位の表示の外に出す。訳の有無・長さで下のボタンが上下しないよう、2 行分の高さを常にとる */
+.translation {
+  min-height: 3em;
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.translationControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: center;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;

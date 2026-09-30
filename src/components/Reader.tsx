@@ -58,6 +58,7 @@ export function Reader() {
       key={openedText.textHash}
       source={openedText.source}
       units={openedText.segmentedText.units}
+      sentences={openedText.segmentedText.sentences}
       textHash={openedText.textHash}
       resumedPosition={openedText.resumedPosition}
       initialSpeed={openedText.speed}
