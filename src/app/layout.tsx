@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { siteUrl } from "@/lib/site";
+// layout.test.tsx が vitest で読み込み、vitest は tsconfig の paths (@/) を解決しないため相対で import する
+import { siteUrl } from "../lib/site";
+import { CloudflareWebAnalyticsBeacon } from "./CloudflareWebAnalyticsBeacon";
 import "./globals.css";
 
 // og:title・og:description は各ページの title・description から引き継がせるため、ここでは画像とサイト名だけを置く
@@ -22,7 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body>
+        {children}
+        <CloudflareWebAnalyticsBeacon />
+      </body>
     </html>
   );
 }

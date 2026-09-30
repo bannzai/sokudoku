@@ -1,0 +1,2 @@
+# 文字コード (Shift_JIS) と改行 (CRLF) の判定を検証するテスト用ファイルのため、改行を変換しない
+src/lib/__fixtures__/** -text

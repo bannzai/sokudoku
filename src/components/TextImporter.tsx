@@ -1,0 +1,115 @@
+"use client";
+
+import { type DragEvent, useRef, useState } from "react";
+import { type ImportResult, importFailureMessages, importFile, importPlainText } from "@/lib/importText";
+import styles from "./TextImporter.module.css";
+
+/** 本文の取り込み部品に渡す値 */
+type TextImporterProps = {
+  /** 取り込めた本文を受け取る。本文はこの部品の外へ渡すだけで、保存も送信もしない */
+  onImport: (text: string) => void;
+};
+
+/** 本文の貼り付け欄と、txt・EPUB のファイル選択 (ドラッグ & ドロップ可) を並べた取り込み部品 */
+export function TextImporter({ onImport }: TextImporterProps) {
+  const [pastedText, setPastedText] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string>();
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  // 取り込み操作ごとに増やす番号。ファイルの読み込みを待つ間に次の操作があった時、古い結果で上書きしないために使う
+  const latestImportRequestIdRef = useRef(0);
+
+  /** 取り込みの結果を、成功なら onImport へ渡し、失敗なら理由を表示する */
+  function handleImportResult(result: ImportResult) {
+    if (result.ok) {
+      setErrorMessage(undefined);
+      onImport(result.text);
+    } else {
+      setErrorMessage(importFailureMessages[result.reason]);
+    }
+  }
+
+  /** 貼り付けた本文を取り込む。読み込み中のファイルがあれば、その結果より後の操作として扱う */
+  function importPastedText() {
+    latestImportRequestIdRef.current += 1;
+    handleImportResult(importPlainText(pastedText));
+  }
+
+  /** 選んだファイルをブラウザ内で読み、本文を取り出す。読み込み中に別の取り込み操作があれば、この結果は捨てる */
+  async function importSelectedFile(file: File) {
+    latestImportRequestIdRef.current += 1;
+    const importRequestId = latestImportRequestIdRef.current;
+    let importResult: ImportResult;
+    try {
+      importResult = importFile(file.name, new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      // 選んだ後にファイルが変更・削除された時などに、ブラウザがファイルを読めず例外になる
+      importResult = { ok: false, reason: "unreadable-file" };
+    }
+    if (importRequestId === latestImportRequestIdRef.current) {
+      handleImportResult(importResult);
+    }
+  }
+
+  /** ドロップしたファイルのうち先頭の 1 つを読む */
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDraggingOver(false);
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      void importSelectedFile(file);
+    }
+  }
+
+  return (
+    <div className={styles.importer}>
+      <section className={styles.section}>
+        <h2 className={styles.heading}>本文を貼り付ける</h2>
+        <textarea
+          className={styles.textarea}
+          value={pastedText}
+          onChange={(event) => setPastedText(event.target.value)}
+          placeholder="読みたい文章をここに貼り付け"
+          rows={8}
+        />
+        <button type="button" className={styles.button} onClick={importPastedText}>
+          この本文を読む
+        </button>
+      </section>
+      <section className={styles.section}>
+        <h2 className={styles.heading}>ファイルを読み込む</h2>
+        <div
+          className={isDraggingOver ? `${styles.dropZone} ${styles.dropZoneActive}` : styles.dropZone}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDraggingOver(true);
+          }}
+          onDragLeave={() => setIsDraggingOver(false)}
+          onDrop={handleDrop}
+        >
+          <p>txt・EPUB をここにドロップ</p>
+          <input
+            type="file"
+            accept=".txt,.epub,text/plain,application/epub+zip"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                void importSelectedFile(file);
+              }
+              event.target.value = "";
+            }}
+          />
+          <p className={styles.note}>
+            青空文庫の txt は注記とルビを除いて読みます
+            <br />
+            DRM 付きの電子書籍は読み込めません
+          </p>
+        </div>
+      </section>
+      {errorMessage && (
+        <p role="alert" className={styles.error}>
+          {errorMessage}
+        </p>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,21 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import RootLayout from "./layout";
+
+describe("RootLayout の Cloudflare Web Analytics の beacon", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("site token があるビルドでは beacon の script を 1 つだけ入れ、token を data-cf-beacon に載せる", () => {
+    vi.stubEnv("CLOUDFLARE_WEB_ANALYTICS_TOKEN", "test-site-token");
+    const html = renderToStaticMarkup(<RootLayout>{null}</RootLayout>);
+    expect(html.match(/beacon\.min\.js/g)).toHaveLength(1);
+    expect(html).toContain('data-cf-beacon="{&quot;token&quot;:&quot;test-site-token&quot;}"');
+  });
+
+  it("site token が無いビルドでは beacon の script を入れない", () => {
+    vi.stubEnv("CLOUDFLARE_WEB_ANALYTICS_TOKEN", "");
+    expect(renderToStaticMarkup(<RootLayout>{null}</RootLayout>)).not.toContain("beacon.min.js");
+  });
+});
