@@ -46,17 +46,24 @@ export type FinishedReadingSummary = {
 };
 
 /**
- * 英文を読んだ日ごとの、訳を出した回数。キーは端末の時刻帯の YYYY-MM-DD。
+ * 日ごとの、英文を読んだかと訳を出した回数。キーは端末の時刻帯の YYYY-MM-DD。
  * documents/DIRECTION.md の判定基準「訳の表示を使った日の割合 (英文を読んだ日のうち)」を判定日に確かめるために残す。
- * 英語の単位を表示し終えた日と、英文を含む本文で訳を出した日にキーを作るため、キーのある日が「英文を読んだ日」になる。
  */
-export type EnglishReadingDays = Record<string, { translationDisplayCount: number }>;
+export type EnglishReadingDays = Record<
+  string,
+  {
+    /** その日に英語の単位を表示し終えたか。真の日が「英文を読んだ日」。 */
+    englishRead: boolean;
+    /** その日に訳を出した回数。 */
+    translationDisplayCount: number;
+  }
+>;
 
 /** 英文を読んだ日と訳を出した回数の集計。 */
 export type EnglishReadingDaysSummary = {
   /** 今日を含む直近 7 日のうち、英文を読んだ日数。 */
   lastSevenDaysEnglishReadingDayCount: number;
-  /** 今日を含む直近 7 日のうち、訳を 1 回以上出した日数。 */
+  /** 今日を含む直近 7 日の英文を読んだ日のうち、訳を 1 回以上出した日数。 */
   lastSevenDaysTranslationDisplayDayCount: number;
   /** 英文を読んだ日ごとの訳を出した回数を、新しい日から並べたもの。 */
   days: { date: string; translationDisplayCount: number }[];
@@ -153,24 +160,29 @@ export function parseEnglishReadingDays(json: string | null): EnglishReadingDays
     return {};
   }
   return Object.fromEntries(
-    Object.entries(value).filter(
-      ([date, day]) =>
-        dateKeyPattern.test(date) &&
-        isNonNegativeInteger(((day ?? {}) as Record<string, unknown>).translationDisplayCount),
-    ),
+    Object.entries(value).filter(([date, day]) => {
+      const { englishRead, translationDisplayCount } = (day ?? {}) as Record<string, unknown>;
+      return dateKeyPattern.test(date) && typeof englishRead === "boolean" && isNonNegativeInteger(translationDisplayCount);
+    }),
   ) as EnglishReadingDays;
 }
 
-/** 指定した時刻の日を、英文を読んだ日として足した記録を返す。既にあれば変えない。 */
+/** 指定した時刻の日を、英文を読んだ日にした記録を返す。その日の訳を出した回数は変えない。 */
 export function addEnglishReadingDay(days: EnglishReadingDays, now: number): EnglishReadingDays {
   const date = localDateKey(now);
-  return date in days ? { ...days } : { ...days, [date]: { translationDisplayCount: 0 } };
+  return { ...days, [date]: { englishRead: true, translationDisplayCount: days[date]?.translationDisplayCount ?? 0 } };
 }
 
-/** 指定した時刻の日の、訳を出した回数を 1 つ増やした記録を返す。 */
+/** 指定した時刻の日の、訳を出した回数を 1 つ増やした記録を返す。英文を読んだ日かは変えない。 */
 export function addTranslationDisplay(days: EnglishReadingDays, now: number): EnglishReadingDays {
   const date = localDateKey(now);
-  return { ...days, [date]: { translationDisplayCount: (days[date]?.translationDisplayCount ?? 0) + 1 } };
+  return {
+    ...days,
+    [date]: {
+      englishRead: days[date]?.englishRead ?? false,
+      translationDisplayCount: (days[date]?.translationDisplayCount ?? 0) + 1,
+    },
+  };
 }
 
 /** 本文の読書位置を書き込んだ対応を返す。上限を超えたら保存が古いものから捨てる。 */
@@ -221,10 +233,11 @@ function lastSevenDateKeys(now: number): Set<string> {
   );
 }
 
-/** 英文を読んだ日の記録を、直近 7 日の日数と日ごとの訳を出した回数にまとめる。 */
+/** 英文を読んだ日の記録を、直近 7 日の日数と日ごとの訳を出した回数にまとめる。英文を読んでいない日は除く。 */
 export function summarizeEnglishReadingDays(days: EnglishReadingDays, now: number): EnglishReadingDaysSummary {
   const lastSevenDates = lastSevenDateKeys(now);
   const sortedDays = Object.entries(days)
+    .filter(([, day]) => day.englishRead)
     .map(([date, day]) => ({ date, translationDisplayCount: day.translationDisplayCount }))
     .sort((left, right) => right.date.localeCompare(left.date));
   const lastSevenDays = sortedDays.filter((day) => lastSevenDates.has(day.date));

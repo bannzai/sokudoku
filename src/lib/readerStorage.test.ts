@@ -119,39 +119,43 @@ describe("英文を読んだ日の記録", () => {
     expect(
       parseEnglishReadingDays(
         JSON.stringify({
-          "2026-09-30": { translationDisplayCount: 3 },
-          "2026-9-1": { translationDisplayCount: 1 },
-          "2026-09-29": { translationDisplayCount: -1 },
+          "2026-09-30": { englishRead: true, translationDisplayCount: 3 },
+          "2026-9-1": { englishRead: true, translationDisplayCount: 1 },
+          "2026-09-29": { englishRead: true, translationDisplayCount: -1 },
+          "2026-09-27": { translationDisplayCount: 1 },
           "2026-09-28": null,
         }),
       ),
-    ).toEqual({ "2026-09-30": { translationDisplayCount: 3 } });
+    ).toEqual({ "2026-09-30": { englishRead: true, translationDisplayCount: 3 } });
     expect(parseEnglishReadingDays("[]")).toEqual({});
     expect(parseEnglishReadingDays(null)).toEqual({});
   });
 
-  it("英文を読んだ日を足しても、その日の訳を出した回数を変えない", () => {
-    const days = addEnglishReadingDay({}, now);
-    expect(days).toEqual({ "2026-09-30": { translationDisplayCount: 0 } });
-    expect(addEnglishReadingDay(addTranslationDisplay(days, now), now)).toEqual({
-      "2026-09-30": { translationDisplayCount: 1 },
+  it("英文を読んだ日にしても、その日の訳を出した回数を変えない", () => {
+    expect(addEnglishReadingDay({}, now)).toEqual({ "2026-09-30": { englishRead: true, translationDisplayCount: 0 } });
+    expect(addEnglishReadingDay(addTranslationDisplay({}, now), now)).toEqual({
+      "2026-09-30": { englishRead: true, translationDisplayCount: 1 },
     });
   });
 
-  it("訳を出すたびに、その日の回数を 1 つ増やす", () => {
+  it("訳を出すたびに、その日の回数を 1 つ増やし、訳を出しただけでは英文を読んだ日にしない", () => {
     expect(addTranslationDisplay(addTranslationDisplay({}, now), now)).toEqual({
-      "2026-09-30": { translationDisplayCount: 2 },
+      "2026-09-30": { englishRead: false, translationDisplayCount: 2 },
+    });
+    expect(addTranslationDisplay(addEnglishReadingDay({}, now), now)).toEqual({
+      "2026-09-30": { englishRead: true, translationDisplayCount: 1 },
     });
   });
 
-  it("直近 7 日の英文を読んだ日数と訳を出した日数、日ごとの回数を新しい日から返す", () => {
+  it("直近 7 日の英文を読んだ日数と訳を出した日数、英文を読んだ日ごとの回数を新しい日から返す", () => {
     expect(
       summarizeEnglishReadingDays(
         {
-          "2026-09-23": { translationDisplayCount: 5 },
-          "2026-09-30": { translationDisplayCount: 2 },
-          "2026-09-24": { translationDisplayCount: 0 },
-          "2026-09-28": { translationDisplayCount: 1 },
+          "2026-09-23": { englishRead: true, translationDisplayCount: 5 },
+          "2026-09-30": { englishRead: true, translationDisplayCount: 2 },
+          "2026-09-24": { englishRead: true, translationDisplayCount: 0 },
+          "2026-09-28": { englishRead: true, translationDisplayCount: 1 },
+          "2026-09-29": { englishRead: false, translationDisplayCount: 4 },
         },
         now,
       ),
