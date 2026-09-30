@@ -22,6 +22,11 @@ const pauseLengthInUnits: Record<Pause, number> = {
 // readingUnits.test.ts の青空文庫の抜粋 (夏目漱石「吾輩は猫である」の冒頭) を BudouX で分けた文節の平均 (約 4.6 文字) に近い整数
 const japaneseCharactersPerAverageUnit = 5;
 
+/** 日本語の単位の文字数を返す。空白を除き、句読点・括弧は含めて数える。表示時間と読了した文字数の両方がこの数え方を使う。 */
+export function japaneseCharacterCount(text: string): number {
+  return [...text.replace(/\s/gu, "")].length;
+}
+
 /**
  * 単位を表示する時間 (ミリ秒) を返す。
  *
@@ -36,7 +41,7 @@ export function displayDurationMs(unit: Pick<ReadingUnit, "text" | "language" | 
     const millisecondsPerCharacter = 60_000 / speed.japaneseCharactersPerMinute;
     return Math.round(
       millisecondsPerCharacter *
-        ([...unit.text.replace(/\s/gu, "")].length +
+        (japaneseCharacterCount(unit.text) +
           pauseLengthInUnits[unit.pause] * japaneseCharactersPerAverageUnit),
     );
   }
