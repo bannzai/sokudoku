@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { presentLanguages } from "./readerState";
+import { segmentText } from "./readingUnits";
 import {
   applyDownloadProgress,
   applyTranslatorAvailability,
   applyTranslatorCreated,
   applyTranslatorCreationFailed,
   canToggleTranslation,
+  containsEnglishSentence,
   initialTranslationState,
+  isTranslationDisplayed,
   startsCreatingTranslator,
   toggleTranslation,
   type TranslationState,
@@ -105,5 +109,42 @@ describe("翻訳器の作成", () => {
     expect(applyDownloadProgress(ready, 0.5)).toBe(ready);
     expect(applyTranslatorCreated(ready)).toBe(ready);
     expect(applyTranslatorCreationFailed(ready)).toBe(ready);
+  });
+});
+
+describe("訳の出し入れの UI を出すか", () => {
+  it("英単語を含む日本語の文だけの本文では、単位に英語があっても出さない", () => {
+    const { sentences, units } = segmentText("Chrome の Translator API を使う。");
+    expect(presentLanguages(units)).toContain("en");
+    expect(containsEnglishSentence(sentences)).toBe(false);
+  });
+
+  it("英文の文があれば出す", () => {
+    expect(containsEnglishSentence(segmentText("日本語の段落。\nThis is English.").sentences)).toBe(true);
+  });
+});
+
+describe("今の文の訳が画面に出る状態か", () => {
+  const shown: TranslationState = { translatorStatus: "ready", visible: true };
+
+  it("作り終えて表示中で、今の文が英文なら出る", () => {
+    expect(isTranslationDisplayed(shown, { currentSentenceLanguage: "en", finished: false })).toBe(true);
+  });
+
+  it("今の文が日本語の文なら、表示中でも出ない", () => {
+    expect(isTranslationDisplayed(shown, { currentSentenceLanguage: "ja", finished: false })).toBe(false);
+  });
+
+  it("読了画面・非表示・作っている間は出ない", () => {
+    expect(isTranslationDisplayed(shown, { currentSentenceLanguage: "en", finished: true })).toBe(false);
+    expect(
+      isTranslationDisplayed({ ...shown, visible: false }, { currentSentenceLanguage: "en", finished: false }),
+    ).toBe(false);
+    expect(
+      isTranslationDisplayed(
+        { translatorStatus: "creating", visible: true },
+        { currentSentenceLanguage: "en", finished: false },
+      ),
+    ).toBe(false);
   });
 });

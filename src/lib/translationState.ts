@@ -1,3 +1,5 @@
+import type { Language, Sentence } from "./readingUnits";
+
 /** Translator API の availability() が返す値。 */
 export type TranslatorAvailability = "unavailable" | "downloadable" | "downloading" | "available";
 
@@ -65,6 +67,24 @@ export function toggleTranslation(state: TranslationState): TranslationState {
 /** 状態の変化が、翻訳器を作り始める変化かを返す。 */
 export function startsCreatingTranslator(previous: TranslationState, next: TranslationState): boolean {
   return previous.translatorStatus !== "creating" && next.translatorStatus === "creating";
+}
+
+/**
+ * 本文に英文の文があるかを返す。訳の出し入れの UI を出すかを決める。
+ * 訳す単位は文のため、文の言語で決める (単位の言語で決めると、英単語を含む日本語の文だけの本文でも UI が出てしまう)。
+ */
+export function containsEnglishSentence(sentences: readonly Sentence[]): boolean {
+  return sentences.some((sentence) => sentence.language === "en");
+}
+
+/** 今の文の訳が画面に出る状態かを返す。翻訳器を作り終えて表示中で、今の文が英文で、読了画面でない時だけ真。訳を出した回数の記録に使う。 */
+export function isTranslationDisplayed(
+  state: TranslationState,
+  params: { currentSentenceLanguage: Language; finished: boolean },
+): boolean {
+  return (
+    state.visible && state.translatorStatus === "ready" && params.currentSentenceLanguage === "en" && !params.finished
+  );
 }
 
 /** 言語モデルのダウンロードの進み具合 (0〜1) を反映する。翻訳器を作っている間だけ反映する。 */

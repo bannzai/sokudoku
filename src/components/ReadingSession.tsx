@@ -45,7 +45,9 @@ import {
   applyTranslatorCreated,
   applyTranslatorCreationFailed,
   canToggleTranslation,
+  containsEnglishSentence,
   initialTranslationState,
+  isTranslationDisplayed,
   startsCreatingTranslator,
   toggleTranslation,
   type TranslationState,
@@ -344,21 +346,22 @@ export function ReadingSession({
   const recordedEnglishReadingDateRef = useRef<string>(undefined);
   const languages = useMemo(() => presentLanguages(units), [units]);
   const remainingDurations = useMemo(() => remainingDurationsMs(units, readerState.speed), [units, readerState.speed]);
-  const hasEnglish = languages.includes("en");
+  const hasEnglishSentence = useMemo(() => containsEnglishSentence(sentences), [sentences]);
   const currentSentenceIndex = units[readerState.unitIndex].sentenceIndex;
-  // 読了画面では訳を出さないため、表示中の扱いにしない
-  const isTranslationShown =
-    translationState.visible && translationState.translatorStatus === "ready" && readerState.status !== "finished";
+  const isTranslationShown = isTranslationDisplayed(translationState, {
+    currentSentenceLanguage: sentences[currentSentenceIndex].language,
+    finished: readerState.status === "finished",
+  });
 
   // 英文を含む本文では、翻訳器を作れるかを先に確かめ、切り替えボタンを有効にするか・理由を出すかを決める
   useEffect(() => {
-    if (!hasEnglish) {
+    if (!hasEnglishSentence) {
       return;
     }
     void checkTranslatorAvailability().then((availability) =>
       setTranslationState((state) => applyTranslatorAvailability(state, availability)),
     );
-  }, [hasEnglish]);
+  }, [hasEnglishSentence]);
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -376,7 +379,6 @@ export function ReadingSession({
     if (
       !isTranslationShown ||
       translator === undefined ||
-      sentence.language !== "en" ||
       currentSentenceIndex in sentenceTranslations ||
       translatingSentenceIndexesRef.current.has(currentSentenceIndex)
     ) {
@@ -392,7 +394,7 @@ export function ReadingSession({
       .finally(() => translatingSentenceIndexesRef.current.delete(currentSentenceIndex));
   }, [currentSentenceIndex, isTranslationShown, sentenceTranslations, sentences, source]);
 
-  // 訳が出る状態 (翻訳器を作り終えて表示中) に変わるたびに、その日の訳を出した回数を記録する。翻訳器を作れなかった操作は数えない
+  // 今の文の訳が画面に出る状態に変わるたびに、その日の訳を出した回数を記録する。翻訳器を作れなかった操作と、日本語の文の上で出した操作は数えない
   useEffect(() => {
     if (isTranslationShown) {
       recordTranslationDisplay(Date.now());
@@ -494,7 +496,7 @@ export function ReadingSession({
       if (event.target.closest("input, textarea, select") || (event.key === " " && event.target.closest("button"))) {
         return;
       }
-      if (hasEnglish && readerState.status !== "finished" && event.key.toLowerCase() === "t") {
+      if (hasEnglishSentence && readerState.status !== "finished" && event.key.toLowerCase() === "t") {
         event.preventDefault();
         if (canToggleTranslation(translationState)) {
           toggleTranslationDisplay();
@@ -518,7 +520,7 @@ export function ReadingSession({
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [hasEnglish, languages, readerState, toggleTranslationDisplay, translationState]);
+  }, [hasEnglishSentence, languages, readerState, toggleTranslationDisplay, translationState]);
 
   if (readerState.status === "finished") {
     return (
@@ -554,11 +556,10 @@ export function ReadingSession({
       >
         <span className={styles.unitText}>{currentUnit.text}</span>
       </button>
-      {hasEnglish && (
+      {hasEnglishSentence && (
         // 単位の表示の外 (下) に今の文の訳だけを出す。原文の文と訳を対にして並べない (ADR 0002)
         <p className={styles.translation} lang="ja" aria-live="polite">
           {isTranslationShown &&
-            sentences[currentSentenceIndex].language === "en" &&
             (currentSentenceTranslation === undefined
               ? "訳しています"
               : (currentSentenceTranslation ?? "この文は訳せませんでした"))}
@@ -606,7 +607,7 @@ export function ReadingSession({
           次の文
         </button>
       </div>
-      {hasEnglish && (
+      {hasEnglishSentence && (
         <div className={styles.translationControls}>
           <button
             type="button"
@@ -656,7 +657,7 @@ export function ReadingSession({
         })}
       </div>
       <p className={styles.keyHelp}>
-        space 再生と一時停止 ・ ← → 1 単位 ・ shift + ← → 1 文 ・ ↑ ↓ 速度{hasEnglish && " ・ T 訳の出し入れ"}
+        space 再生と一時停止 ・ ← → 1 単位 ・ shift + ← → 1 文 ・ ↑ ↓ 速度{hasEnglishSentence && " ・ T 訳の出し入れ"}
       </p>
       {!isPlaying && (
         <section className={styles.fullTextSection}>
