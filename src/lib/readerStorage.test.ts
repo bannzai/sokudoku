@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  addEnglishReadingDay,
   addFinishedReading,
+  addTranslationDisplay,
   type FinishedReading,
   hashText,
   localDateKey,
+  parseEnglishReadingDays,
   parseFinishedReadings,
   parseReadingPositions,
   parseReadingSpeed,
   type ReadingPosition,
   resumablePosition,
+  summarizeEnglishReadingDays,
   summarizeFinishedReadings,
   upsertReadingPosition,
 } from "./readerStorage";
@@ -105,6 +109,62 @@ describe("読了の記録", () => {
 
   it("日付は端末の時刻帯の YYYY-MM-DD にする", () => {
     expect(localDateKey(new Date(2026, 0, 5, 23, 59).getTime())).toBe("2026-01-05");
+  });
+});
+
+describe("英文を読んだ日の記録", () => {
+  const now = new Date(2026, 8, 30, 12).getTime();
+
+  it("日付の形でないキーと、形の合わない項目を捨てて読む", () => {
+    expect(
+      parseEnglishReadingDays(
+        JSON.stringify({
+          "2026-09-30": { translationDisplayCount: 3 },
+          "2026-9-1": { translationDisplayCount: 1 },
+          "2026-09-29": { translationDisplayCount: -1 },
+          "2026-09-28": null,
+        }),
+      ),
+    ).toEqual({ "2026-09-30": { translationDisplayCount: 3 } });
+    expect(parseEnglishReadingDays("[]")).toEqual({});
+    expect(parseEnglishReadingDays(null)).toEqual({});
+  });
+
+  it("英文を読んだ日を足しても、その日の訳を出した回数を変えない", () => {
+    const days = addEnglishReadingDay({}, now);
+    expect(days).toEqual({ "2026-09-30": { translationDisplayCount: 0 } });
+    expect(addEnglishReadingDay(addTranslationDisplay(days, now), now)).toEqual({
+      "2026-09-30": { translationDisplayCount: 1 },
+    });
+  });
+
+  it("訳を出すたびに、その日の回数を 1 つ増やす", () => {
+    expect(addTranslationDisplay(addTranslationDisplay({}, now), now)).toEqual({
+      "2026-09-30": { translationDisplayCount: 2 },
+    });
+  });
+
+  it("直近 7 日の英文を読んだ日数と訳を出した日数、日ごとの回数を新しい日から返す", () => {
+    expect(
+      summarizeEnglishReadingDays(
+        {
+          "2026-09-23": { translationDisplayCount: 5 },
+          "2026-09-30": { translationDisplayCount: 2 },
+          "2026-09-24": { translationDisplayCount: 0 },
+          "2026-09-28": { translationDisplayCount: 1 },
+        },
+        now,
+      ),
+    ).toEqual({
+      lastSevenDaysEnglishReadingDayCount: 3,
+      lastSevenDaysTranslationDisplayDayCount: 2,
+      days: [
+        { date: "2026-09-30", translationDisplayCount: 2 },
+        { date: "2026-09-28", translationDisplayCount: 1 },
+        { date: "2026-09-24", translationDisplayCount: 0 },
+        { date: "2026-09-23", translationDisplayCount: 5 },
+      ],
+    });
   });
 });
 
