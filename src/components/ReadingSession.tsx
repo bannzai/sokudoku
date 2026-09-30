@@ -336,6 +336,8 @@ export function ReadingSession({
   // 文の添字から訳への対応。null は訳せなかった文。本文ごとに作り直す画面 (key が本文のハッシュ) のため、本文を変えると捨てる
   const [sentenceTranslations, setSentenceTranslations] = useState<Record<number, string | null>>({});
   const translatorRef = useRef<EnglishToJapaneseTranslator>(undefined);
+  // 画面を閉じたか。言語モデルのダウンロード中に閉じた後で作り終えた翻訳器を、使わずに手放すために持つ
+  const isUnmountedRef = useRef(false);
   // 訳している最中の文の添字。同じ文を二重に訳さないために持つ
   const translatingSentenceIndexesRef = useRef(new Set<number>());
   // 英文を読んだ日として保存済みの日付。英語の単位を表示し終えるたびに localStorage を書き直さないために持つ
@@ -344,7 +346,9 @@ export function ReadingSession({
   const remainingDurations = useMemo(() => remainingDurationsMs(units, readerState.speed), [units, readerState.speed]);
   const hasEnglish = languages.includes("en");
   const currentSentenceIndex = units[readerState.unitIndex].sentenceIndex;
-  const isTranslationShown = translationState.visible && translationState.translatorStatus === "ready";
+  // 読了画面では訳を出さないため、表示中の扱いにしない
+  const isTranslationShown =
+    translationState.visible && translationState.translatorStatus === "ready" && readerState.status !== "finished";
 
   // 英文を含む本文では、翻訳器を作れるかを先に確かめ、切り替えボタンを有効にするか・理由を出すかを決める
   useEffect(() => {
@@ -356,13 +360,14 @@ export function ReadingSession({
     );
   }, [hasEnglish]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => {
+      isUnmountedRef.current = true;
       translatorRef.current?.destroy();
       translatorRef.current = undefined;
-    },
-    [],
-  );
+    };
+  }, []);
 
   // 訳を表示している間は、今の文が英文で訳が無ければ訳す。訳は文ごとに残し、同じ文に戻った時は訳し直さない
   useEffect(() => {
@@ -401,6 +406,10 @@ export function ReadingSession({
     if (startsCreatingTranslator(translationState, nextTranslationState)) {
       createTranslator((loaded) => setTranslationState((state) => applyDownloadProgress(state, loaded))).then(
         (translator) => {
+          if (isUnmountedRef.current) {
+            translator.destroy();
+            return;
+          }
           translatorRef.current = translator;
           setTranslationState(applyTranslatorCreated);
         },
@@ -485,7 +494,7 @@ export function ReadingSession({
       if (event.target.closest("input, textarea, select") || (event.key === " " && event.target.closest("button"))) {
         return;
       }
-      if (hasEnglish && event.key.toLowerCase() === "t") {
+      if (hasEnglish && readerState.status !== "finished" && event.key.toLowerCase() === "t") {
         event.preventDefault();
         if (canToggleTranslation(translationState)) {
           toggleTranslationDisplay();
