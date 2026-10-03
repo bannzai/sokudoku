@@ -2,6 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RootLayout from "./layout";
 
+// next/font/google は Next.js のビルド時の変換が無いと呼べず、vitest では読み込めないため、書体の class 名を空にする
+vi.mock("./fonts", () => ({ fontVariableClassNames: "" }));
+
 describe("RootLayout の Cloudflare Web Analytics の beacon", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

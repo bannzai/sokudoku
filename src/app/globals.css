@@ -1,38 +1,113 @@
+/*
+ * デザイントークン。値は documents/design/mock-2026-10-01/index.html のモックから取った。
+ * ライトは白の地と青みの墨色、ダークは #14171b の地と真っ白にしない文字色で、長く読んでも眩しくないようにする。アクセントは藍色 1 色
+ */
 :root {
+  /* 地の色 */
   --color-background: #ffffff;
-  --color-text: #1a1a1a;
-  --color-muted: #666666;
-  --color-border: #dddddd;
-  --color-accent: #1d4ed8;
+  /* 地より一段沈めた面 (無効なボタンなど) */
+  --color-surface: #f2f4f7;
+  /* 本文の文字色 */
+  --color-text: #1b2027;
+  /* 補足の文字色 */
+  --color-muted: #57616c;
+  /* 注記など最も弱い文字色 */
+  --color-faint: #88919b;
+  /* 区切り線と枠線 */
+  --color-border: #d8dde3;
+  /* 文節の表示位置を示す縦線 */
+  --color-tick: #9aa5b2;
+  /* 主な操作とリンクの色 */
+  --color-accent: #2b4c7e;
+  /* アクセントの面に載せる文字色 */
   --color-on-accent: #ffffff;
+  /* アクセントの薄い面 (ドロップ中の枠など) */
+  --color-accent-soft: #e6ecf5;
+  /* 停止中の全文で現在位置を示すハイライト */
+  --color-highlight: #d9e3f2;
+  /* キーボードのフォーカスの輪郭 */
+  --color-focus: #2b4c7e;
+  /* 取り込みの失敗などの文字色 */
+  --color-error: #b3261e;
+
+  /* 画面の操作と説明の書体 */
+  --font-ui: var(--font-biz-udpgothic), "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  /* 英文の文節と全文の書体。欧文は Literata、和文は BIZ UDPMincho で出す */
+  --font-read: var(--font-literata), var(--font-biz-udpmincho), "Hiragino Mincho ProN", "Yu Mincho", serif;
+  /* 日本語の文節の書体。文中の数字・欧文も明朝でそろえる */
+  --font-read-ja: var(--font-biz-udpmincho), "Hiragino Mincho ProN", "Yu Mincho", serif;
+
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: #121212;
-    --color-text: #eeeeee;
-    --color-muted: #aaaaaa;
-    --color-border: #333333;
-    --color-accent: #8ab4ff;
-    --color-on-accent: #0b1020;
+    --color-background: #14171b;
+    --color-surface: #1b1f25;
+    --color-text: #cbd2da;
+    --color-muted: #8e98a3;
+    --color-faint: #68717b;
+    --color-border: #2a3139;
+    --color-tick: #4c5664;
+    --color-accent: #8ea9d8;
+    --color-on-accent: #10141a;
+    --color-accent-soft: #1f2836;
+    --color-highlight: #2a3650;
+    --color-focus: #8ea9d8;
+    --color-error: #f2b8b5;
+    color-scheme: dark;
   }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
   background: var(--color-background);
   color: var(--color-text);
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
-  line-height: 1.7;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ブラウザ既定のリンク色 (濃い青) はダークモードの背景で読めないため、配色に合わせる */
 a {
   color: var(--color-accent);
+  text-underline-offset: 0.2em;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ボタンに併記するキー */
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 3px 5px 2px;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1;
+  color: inherit;
+  text-align: center;
+  border: 1px solid currentColor;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  opacity: 0.8;
 }
 
 main {
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 32px 16px;
 }
