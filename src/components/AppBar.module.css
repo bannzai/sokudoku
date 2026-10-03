@@ -1,5 +1,8 @@
+/* 左右の余白と最大幅を main (globals.css) とそろえ、サービス名の左端を本文の左端に合わせる */
 .appBar {
-  padding-inline: 16px;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
 }
 
 .inner {
@@ -7,9 +10,6 @@
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding-block: 16px;
   font-size: 13px;
   color: var(--color-muted);
 }
