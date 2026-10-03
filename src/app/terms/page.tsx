@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { AppBar } from "@/components/AppBar";
 import { renderLegalDocument } from "@/lib/legalDocument";
+import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
   title: "利用規約 | sokudoku",
@@ -7,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default async function TermsPage() {
-  return <main dangerouslySetInnerHTML={{ __html: await renderLegalDocument("terms") }} />;
+  return (
+    <>
+      <AppBar />
+      <main className={styles.legal} dangerouslySetInnerHTML={{ __html: await renderLegalDocument("terms") }} />
+    </>
+  );
 }

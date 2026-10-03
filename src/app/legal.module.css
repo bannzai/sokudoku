@@ -1,0 +1,37 @@
+/* 利用規約・プライバシーポリシーの本文。content/legal/ の markdown を HTML にしたものを、読みやすい行の長さで出す */
+.legal {
+  max-width: 720px;
+  padding-block: 16px 64px;
+}
+
+.legal h1 {
+  margin: 0 0 24px;
+  font-size: 24px;
+}
+
+.legal h2 {
+  margin: 40px 0 12px;
+  padding-top: 20px;
+  font-size: 17px;
+  border-top: 1px solid var(--color-border);
+}
+
+.legal h3 {
+  margin: 24px 0 8px;
+  font-size: 15px;
+}
+
+.legal p,
+.legal ul,
+.legal ol {
+  margin: 0 0 12px;
+}
+
+.legal ul,
+.legal ol {
+  padding-left: 1.6em;
+}
+
+.legal li + li {
+  margin-top: 4px;
+}
