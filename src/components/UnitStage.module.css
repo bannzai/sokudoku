@@ -1,0 +1,40 @@
+/*
+ * 単位 (文節・単語) を出す位置。上下の細い縦線で位置を示し、単位はいつも中央揃え・単色・単一の太さで出す。
+ * 単位の中の特定の文字の色・位置を変えない (ADR 0002)
+ */
+.stage {
+  display: grid;
+  grid-template-rows: 28px auto 28px;
+  row-gap: 18px;
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+}
+
+.stage::before,
+.stage::after {
+  width: 1px;
+  height: 28px;
+  content: "";
+  background: var(--color-tick);
+}
+
+.unitText {
+  width: 100%;
+  min-height: 1.5em;
+  font-family: var(--font-read);
+  /* 置き場所の広さに合わせて親が --unit-text-size で上書きする。既定はリーダー画面の大きさ */
+  font-size: var(--unit-text-size, clamp(34px, 7vw, 60px));
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text);
+  text-align: center;
+  letter-spacing: 0.02em;
+  /* 狭い画面で長い英単語が横にはみ出さないよう、収まらない時だけ折り返す */
+  overflow-wrap: anywhere;
+}
+
+.japanese {
+  font-family: var(--font-read-ja);
+  letter-spacing: 0.06em;
+}

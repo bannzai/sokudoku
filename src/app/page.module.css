@@ -1,11 +1,23 @@
+.page {
+  display: grid;
+  gap: 72px;
+  padding-block: 56px 48px;
+}
+
 .hero {
-  padding: 16px 0 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
 }
 
 .productName {
   margin: 0;
-  color: var(--color-muted);
-  font-weight: 700;
+  font-family: var(--font-read);
+  font-size: clamp(40px, 6vw, 64px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 /* 狭い幅で「読む」「ません」のような語の途中から 1 文字だけが次の行に落ちないよう、文節の区切りで折り返す */
@@ -16,114 +28,130 @@
 }
 
 .title {
-  margin: 8px 0 16px;
-  font-size: clamp(1.75rem, 6vw, 2.5rem);
-  line-height: 1.3;
+  margin: 20px 0 0;
+  font-size: clamp(18px, 2.2vw, 22px);
+  font-weight: 400;
+  line-height: 1.7;
 }
 
 .lead {
-  margin: 0 0 24px;
+  max-width: 30em;
+  margin: 12px 0 0;
+  color: var(--color-muted);
 }
 
-.primaryAction {
-  display: inline-block;
-  padding: 12px 28px;
-  border-radius: 6px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: 700;
-  text-decoration: none;
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 28px;
 }
 
-.primaryAction:hover {
-  opacity: 0.9;
-}
-
-.primaryAction:focus-visible {
-  outline: 3px solid var(--color-accent);
-  outline-offset: 3px;
+.tag {
+  padding: 1px 6px;
+  font-size: 11.5px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
 }
 
 .preview {
-  margin: 40px 0 0;
-}
+  /* 表示の例は hero の横幅に収まるよう、リーダー画面より小さくする */
+  --unit-text-size: clamp(30px, 4.4vw, 44px);
 
-/* 文節を中央揃えで置き、上下の縦線で表示位置を示す (ADR 0002 で中央揃え以外の配置と 1 文字の色付けを作らない) */
-.stage {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 168px;
+  display: grid;
+  gap: 28px;
+  margin: 0;
+  padding: 40px 16px 20px;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: var(--color-text);
-  color: var(--color-background);
-  font-size: clamp(1.5rem, 6vw, 2.25rem);
-}
-
-.stage::before,
-.stage::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  width: 2px;
-  height: 20px;
-  background: var(--color-muted);
-  transform: translateX(-50%);
-}
-
-.stage::before {
-  top: 24px;
-}
-
-.stage::after {
-  bottom: 24px;
 }
 
 .caption {
-  margin-top: 8px;
-  color: var(--color-muted);
-  font-size: 0.875rem;
-}
-
-.section {
-  padding: 32px 0;
-  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--color-faint);
 }
 
 .heading {
-  margin: 0 0 16px;
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 20px;
   line-height: 1.4;
 }
 
 .steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 24px;
-  margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 24px 0 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--color-border);
 }
 
-.steps p {
+.step {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 20px 20px 22px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.step p {
   margin: 0;
+  font-size: 14px;
+  color: var(--color-muted);
 }
 
 .stepTitle {
-  margin: 0 0 4px;
-  font-size: 1.0625rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin: 0;
+  font-size: 15px;
 }
 
 .note {
-  margin: 24px 0 0;
+  margin: 20px 0 0;
+  font-size: 13px;
   color: var(--color-muted);
-  font-size: 0.875rem;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 48px;
+}
+
+.sectionBody {
+  margin-top: 8px;
+  color: var(--color-muted);
+}
+
+.sectionBody p {
+  margin: 0;
+}
+
+.sectionBody p + p {
+  margin-top: 10px;
 }
 
 .footer {
-  padding: 24px 0 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding-top: 20px;
+  font-size: 13px;
+  color: var(--color-muted);
   border-top: 1px solid var(--color-border);
+}
+
+.footer a {
+  color: var(--color-muted);
 }
 
 .footerLinks {
@@ -133,4 +161,19 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@media (max-width: 760px) {
+  .page {
+    gap: 56px;
+    padding-block: 32px;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .step {
+    padding-right: 0;
+  }
 }

@@ -1,0 +1,30 @@
+.appBar {
+  padding-inline: 16px;
+}
+
+.inner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-block: 16px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.name {
+  font-family: var(--font-read);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.description {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,57 @@
+/* 画面共通のボタン。リンクにも付けられるよう、文字の装飾と表示形式もここで決める */
+.button {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.button:hover {
+  border-color: var(--color-tick);
+}
+
+.button:disabled {
+  color: var(--color-faint);
+  cursor: not-allowed;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+/* 画面で最も主な操作 (再生・読み始める等)。1 画面に 1 つだけ置く */
+.primary {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.primary:hover {
+  border-color: var(--color-accent);
+  filter: brightness(1.08);
+}
+
+.primary kbd {
+  border-color: color-mix(in srgb, var(--color-on-accent) 55%, transparent);
+}
+
+/* 速度の上げ下げなど、並べて置く控えめな操作 */
+.quiet {
+  color: var(--color-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.quiet:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
