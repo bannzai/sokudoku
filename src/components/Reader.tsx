@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AppBar } from "@/components/AppBar";
 import { TextImporter } from "@/components/TextImporter";
 import type { ReadingSpeed } from "@/lib/displayDuration";
 import { defaultReadingSpeed } from "@/lib/readerState";
@@ -43,14 +44,17 @@ export function Reader() {
 
   if (openedText === undefined) {
     return (
-      <main>
-        <h1 className={styles.title}>読む本文を選ぶ</h1>
-        <TextImporter onImport={(source) => void openText(source)} />
-        <nav className={styles.legalLinks}>
-          <Link href="/terms/">利用規約</Link>
-          <Link href="/privacy/">プライバシーポリシー</Link>
-        </nav>
-      </main>
+      <>
+        <AppBar />
+        <main className={styles.importPage}>
+          <h1 className={styles.title}>読む本文を選ぶ</h1>
+          <TextImporter onImport={(source) => void openText(source)} />
+          <nav className={styles.legalLinks}>
+            <Link href="/terms/">利用規約</Link>
+            <Link href="/privacy/">プライバシーポリシー</Link>
+          </nav>
+        </main>
+      </>
     );
   }
   return (

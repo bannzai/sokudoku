@@ -2,6 +2,7 @@
 
 import { type DragEvent, useRef, useState } from "react";
 import { type ImportResult, importFailureMessages, importFile, importPlainText } from "@/lib/importText";
+import buttonStyles from "./Button.module.css";
 import styles from "./TextImporter.module.css";
 
 /** 本文の取り込み部品に渡す値 */
@@ -17,6 +18,8 @@ export function TextImporter({ onImport }: TextImporterProps) {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   // 取り込み操作ごとに増やす番号。ファイルの読み込みを待つ間に次の操作があった時、古い結果で上書きしないために使う
   const latestImportRequestIdRef = useRef(0);
+  // 見た目をボタンにそろえるため、ファイル選択の input は隠し、「ファイルを選ぶ」ボタンから開く
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /** 取り込みの結果を、成功なら onImport へ渡し、失敗なら理由を表示する */
   function handleImportResult(result: ImportResult) {
@@ -62,54 +65,67 @@ export function TextImporter({ onImport }: TextImporterProps) {
 
   return (
     <div className={styles.importer}>
-      <section className={styles.section}>
-        <h2 className={styles.heading}>本文を貼り付ける</h2>
-        <textarea
-          className={styles.textarea}
-          value={pastedText}
-          onChange={(event) => setPastedText(event.target.value)}
-          placeholder="読みたい文章をここに貼り付け"
-          rows={8}
-        />
-        <button type="button" className={styles.button} onClick={importPastedText}>
-          この本文を読む
-        </button>
-      </section>
-      <section className={styles.section}>
-        <h2 className={styles.heading}>ファイルを読み込む</h2>
-        <div
-          className={isDraggingOver ? `${styles.dropZone} ${styles.dropZoneActive}` : styles.dropZone}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDraggingOver(true);
-          }}
-          onDragLeave={() => setIsDraggingOver(false)}
-          onDrop={handleDrop}
-        >
-          <p>txt・EPUB をここにドロップ</p>
-          <input
-            type="file"
-            accept=".txt,.epub,text/plain,application/epub+zip"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                void importSelectedFile(file);
-              }
-              event.target.value = "";
-            }}
+      <div className={styles.columns}>
+        <section className={styles.section}>
+          <h2 className={styles.heading}>
+            <label htmlFor="pasted-text">本文を貼り付ける</label>
+          </h2>
+          <textarea
+            id="pasted-text"
+            className={styles.textarea}
+            value={pastedText}
+            onChange={(event) => setPastedText(event.target.value)}
+            placeholder="読みたい文章をここに貼り付け"
+            rows={8}
           />
-          <p className={styles.note}>
-            青空文庫の txt は注記とルビを除いて読みます
-            <br />
-            DRM 付きの電子書籍は読み込めません
-          </p>
-        </div>
-      </section>
+        </section>
+        <section className={styles.section}>
+          <h2 className={styles.heading}>ファイルを読み込む</h2>
+          <div
+            className={isDraggingOver ? `${styles.dropZone} ${styles.dropZoneActive}` : styles.dropZone}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDraggingOver(true);
+            }}
+            onDragLeave={() => setIsDraggingOver(false)}
+            onDrop={handleDrop}
+          >
+            <p className={styles.dropTitle}>txt・EPUB をここにドロップ</p>
+            <button type="button" className={buttonStyles.button} onClick={() => fileInputRef.current?.click()}>
+              ファイルを選ぶ
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.epub,text/plain,application/epub+zip"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void importSelectedFile(file);
+                }
+                event.target.value = "";
+              }}
+            />
+            <p className={styles.note}>
+              青空文庫の txt は注記とルビを除いて読みます
+              <br />
+              DRM 付きの電子書籍は読み込めません
+            </p>
+          </div>
+        </section>
+      </div>
       {errorMessage && (
         <p role="alert" className={styles.error}>
           {errorMessage}
         </p>
       )}
+      <div className={styles.footer}>
+        <p className={styles.privacy}>本文はこのブラウザの中だけで処理します。サーバーには送らず、保存もしません。</p>
+        <button type="button" className={`${buttonStyles.button} ${buttonStyles.primary}`} onClick={importPastedText}>
+          この本文を読む
+        </button>
+      </div>
     </div>
   );
 }
