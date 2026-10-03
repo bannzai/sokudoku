@@ -1,0 +1,1013 @@
+<title>sokudoku デザインモック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDPMincho:wght@400;700&family=Literata:opsz,wght@7..72,400;7..72,500&display=swap">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f2f4f7;
+    --ink: #1b2027;
+    --muted: #57616c;
+    --faint: #88919b;
+    --line: #d8dde3;
+    --tick: #9aa5b2;
+    --accent: #2b4c7e;
+    --accent-ink: #ffffff;
+    --accent-soft: #e6ecf5;
+    --mark: #d9e3f2;
+    --focus: #2b4c7e;
+    --font-ui: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    --font-read: "Literata", "BIZ UDPMincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --font-read-ja: "BIZ UDPMincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171b;
+      --surface: #1b1f25;
+      --ink: #cbd2da;
+      --muted: #8e98a3;
+      --faint: #68717b;
+      --line: #2a3139;
+      --tick: #4c5664;
+      --accent: #8ea9d8;
+      --accent-ink: #10141a;
+      --accent-soft: #1f2836;
+      --mark: #2a3650;
+      --focus: #8ea9d8;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171b;
+    --surface: #1b1f25;
+    --ink: #cbd2da;
+    --muted: #8e98a3;
+    --faint: #68717b;
+    --line: #2a3139;
+    --tick: #4c5664;
+    --accent: #8ea9d8;
+    --accent-ink: #10141a;
+    --accent-soft: #1f2836;
+    --mark: #2a3650;
+    --focus: #8ea9d8;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-underline-offset: 0.2em; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; font-weight: 700; }
+  p { margin: 0; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* モックの切り替えバー (プロダクトの UI ではない) */
+  .mockbar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding-inline: 16px;
+  }
+  .mockbar-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding-block: 10px;
+  }
+  .mockbar-name { font-size: 13px; color: var(--muted); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+  .tab, .seg button {
+    font: inherit;
+    font-size: 13px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .tab:hover, .seg button:hover { color: var(--ink); }
+  .tab[aria-selected="true"], .seg button[aria-pressed="true"] {
+    color: var(--ink);
+    background: var(--bg);
+    border-color: var(--line);
+  }
+  .seg { display: inline-flex; gap: 2px; align-items: center; }
+  .seg-label { font-size: 12px; color: var(--faint); margin-right: 4px; }
+
+  .page { padding-inline: 16px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .note {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-block: 12px 0;
+    font-size: 12.5px;
+    color: var(--faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* 共通の部品 */
+  .btn {
+    font: inherit;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    padding: 8px 14px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--tick); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { border-color: var(--accent); filter: brightness(1.08); }
+  .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
+  .btn-quiet:hover { color: var(--ink); border-color: var(--line); }
+  .btn:disabled { cursor: not-allowed; color: var(--faint); border-color: var(--line); background: var(--surface); filter: none; }
+  kbd {
+    font-family: inherit;
+    font-size: 11.5px;
+    line-height: 1;
+    color: inherit;
+    opacity: 0.8;
+    border: 1px solid currentColor;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 3px 5px 2px;
+    min-width: 1.6em;
+    text-align: center;
+    display: inline-block;
+  }
+  .btn-primary kbd { border-color: color-mix(in srgb, var(--accent-ink) 55%, transparent); }
+  .tag {
+    font-size: 11.5px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  /* RSVP の表示位置。文節は常に中央揃え・単色・単一の太さで出す */
+  .stage {
+    position: relative;
+    display: grid;
+    grid-template-rows: 28px auto 28px;
+    justify-items: center;
+    align-items: center;
+    row-gap: 18px;
+    width: 100%;
+  }
+  .tick { width: 1px; height: 28px; background: var(--tick); }
+  .word {
+    min-height: 1.5em;
+    width: 100%;
+    text-align: center;
+    font-family: var(--font-read);
+    font-weight: 400;
+    font-size: clamp(34px, 7vw, 60px);
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .word.is-long { font-size: clamp(26px, 5.4vw, 52px); }
+  .word.is-ja { font-family: var(--font-read-ja); letter-spacing: 0.06em; }
+
+  .progress { height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
+  .progress > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 120ms linear; }
+
+  /* LP */
+  .lp { max-width: 1080px; margin: 0 auto; padding-block: 56px 48px; display: grid; gap: 72px; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+  .hero-name { font-family: "Literata", serif; font-weight: 500; font-size: clamp(40px, 6vw, 64px); letter-spacing: -0.01em; line-height: 1.1; }
+  .hero-lead { margin-top: 20px; font-size: clamp(18px, 2.2vw, 22px); line-height: 1.7; }
+  .hero-sub { margin-top: 12px; color: var(--muted); max-width: 30em; }
+  .hero-actions { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .hero-demo {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 40px 16px 20px;
+    display: grid;
+    gap: 28px;
+  }
+  .hero-demo .word { font-size: clamp(30px, 4.4vw, 44px); }
+  .hero-demo-cap { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--faint); }
+
+  .section-head { font-size: 20px; }
+  .section-lead { margin-top: 8px; color: var(--muted); max-width: 40em; }
+  .howto { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line); }
+  .howto-item { padding: 20px 20px 22px 0; border-bottom: 1px solid var(--line); display: grid; gap: 6px; align-content: start; }
+  .howto-item h3 { font-size: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .howto-item p { color: var(--muted); font-size: 14px; }
+  .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; }
+  .split p + p { margin-top: 10px; }
+  .spec { margin-top: 16px; display: grid; gap: 8px; }
+  .spec div { display: grid; grid-template-columns: 7em minmax(0, 1fr); gap: 12px; font-size: 14px; }
+  .spec dt { color: var(--muted); }
+  .spec dd { margin: 0; }
+  .footer { border-top: 1px solid var(--line); padding-top: 20px; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px; color: var(--muted); }
+  .footer a { color: var(--muted); }
+
+  /* アプリ内の上部バー */
+  .appbar {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-block: 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .appbar-name { font-family: "Literata", serif; font-weight: 500; font-size: 17px; color: var(--ink); }
+  .appbar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+  /* 取り込み */
+  .import { max-width: 1080px; margin: 0 auto; padding-block: 8px 48px; display: grid; gap: 24px; }
+  .import-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; }
+  .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .field-label span { font-weight: 400; color: var(--faint); font-size: 12.5px; }
+  textarea {
+    width: 100%;
+    min-height: 280px;
+    resize: vertical;
+    font-family: var(--font-read-ja);
+    font-size: 15px;
+    line-height: 1.9;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  textarea:focus { border-color: var(--accent); outline: none; }
+  .drop {
+    min-height: 280px;
+    border: 1px dashed var(--tick);
+    border-radius: 6px;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 14px;
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--bg);
+  }
+  .drop.is-over { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .drop-title { color: var(--ink); font-size: 15px; }
+  .drop-types { font-size: 12.5px; color: var(--faint); }
+  .drop-status { font-size: 13px; min-height: 1.75em; }
+  .import-foot { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+  .import-privacy { font-size: 13px; color: var(--muted); max-width: 36em; }
+  .resume {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; font-size: 14px;
+  }
+  .resume-meta { color: var(--muted); font-size: 13px; }
+
+  /* 再生中・訳 */
+  .reader { max-width: 1080px; margin: 0 auto; padding-block: 0 40px; display: grid; }
+  .reader-stage { min-height: 380px; display: grid; align-content: center; padding-block: 48px; }
+  /* 訳の長さや出し入れで文節の位置が動かないよう、上から固定の位置に置いて訳は下へだけ伸ばす */
+  #tr-reader .reader-stage { align-content: start; padding-top: 88px; }
+  .translation {
+    margin: 36px auto 0;
+    width: 100%;
+    max-width: 34em;
+    min-height: 4.2em;
+    text-align: center;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+  .translation-label { display: block; font-size: 11.5px; color: var(--faint); letter-spacing: 0.08em; margin-bottom: 4px; }
+  .controls { display: grid; gap: 14px; }
+  .controls-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; }
+  .controls-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .readout { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .readout strong { color: var(--ink); font-size: 15px; font-weight: 700; }
+  .reader.is-playing .controls { opacity: 0.72; transition: opacity 200ms; }
+  .reader.is-playing .controls:hover, .reader.is-playing .controls:focus-within { opacity: 1; }
+  .unavailable { margin-top: 32px; border-top: 1px solid var(--line); padding-top: 20px; display: grid; gap: 10px; }
+  .unavailable-head { font-size: 13px; color: var(--faint); }
+  .unavailable-row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  .unavailable-reason { font-size: 13px; color: var(--muted); max-width: 36em; }
+
+  /* 一時停止中の全文 */
+  .paused { max-width: 1080px; margin: 0 auto; padding-block: 0 40px; display: grid; gap: 20px; }
+  .paused-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+  .fulltext {
+    max-width: 36em;
+    margin: 0 auto;
+    width: 100%;
+    font-family: var(--font-read-ja);
+    font-size: 18px;
+    line-height: 2.1;
+    display: grid;
+    gap: 1em;
+  }
+  .fulltext.is-en { font-family: var(--font-read); font-size: 18px; line-height: 1.9; }
+  .fulltext p { text-indent: 1em; }
+  .fulltext.is-en p { text-indent: 0; }
+  .chunk { cursor: pointer; border-radius: 2px; }
+  .chunk:hover { text-decoration: underline; text-decoration-color: var(--tick); text-underline-offset: 0.3em; }
+  .chunk.is-current { background: var(--mark); box-shadow: 0 0 0 2px var(--mark); }
+  .paused-hint { text-align: center; font-size: 13px; color: var(--faint); }
+  .paused .controls { border-top: 1px solid var(--line); padding-top: 16px; }
+
+  /* 読了 */
+  .done { max-width: 720px; margin: 0 auto; padding-block: 56px 64px; display: grid; gap: 28px; }
+  .done-title { font-size: 24px; }
+  .done-work { color: var(--muted); margin-top: 6px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--line); }
+  .stat { padding: 20px 16px 20px 0; display: grid; gap: 4px; }
+  .stat + .stat { padding-left: 16px; border-left: 1px solid var(--line); }
+  .stat-label { font-size: 13px; color: var(--muted); }
+  .stat-value { font-family: "Literata", serif; font-size: clamp(24px, 4vw, 32px); font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .stat-value small { font-family: var(--font-ui); font-size: 13px; color: var(--muted); margin-left: 4px; }
+  .done-note { font-size: 13px; color: var(--muted); }
+  .done-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  @media (max-width: 760px) {
+    .hero, .split, .import-grid { grid-template-columns: minmax(0, 1fr); }
+    .howto { grid-template-columns: minmax(0, 1fr); }
+    .howto-item { padding-right: 0; }
+    .lp { gap: 56px; padding-block: 32px; }
+    .reader-stage { min-height: 300px; padding-block: 32px; }
+    .stats { grid-template-columns: minmax(0, 1fr); }
+    .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+    .drop, textarea { min-height: 200px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .progress > span { transition: none; }
+  }
+</style>
+
+<header class="mockbar">
+  <div class="mockbar-inner">
+    <span class="mockbar-name">sokudoku デザインモック</span>
+    <nav class="tabs" role="tablist" aria-label="画面">
+      <button class="tab" role="tab" id="tab-lp" data-view="lp" aria-selected="true">トップページ</button>
+      <button class="tab" role="tab" id="tab-import" data-view="import" aria-selected="false">取り込み</button>
+      <button class="tab" role="tab" id="tab-play" data-view="play" aria-selected="false">再生中</button>
+      <button class="tab" role="tab" id="tab-pause" data-view="pause" aria-selected="false">一時停止中</button>
+      <button class="tab" role="tab" id="tab-translate" data-view="translate" aria-selected="false">英文の訳</button>
+      <button class="tab" role="tab" id="tab-done" data-view="done" aria-selected="false">読了</button>
+    </nav>
+    <div class="seg" role="group" aria-label="配色">
+      <span class="seg-label">配色</span>
+      <button id="theme-system" data-theme-choice="system" aria-pressed="true">システム</button>
+      <button id="theme-light" data-theme-choice="light" aria-pressed="false">ライト</button>
+      <button id="theme-dark" data-theme-choice="dark" aria-pressed="false">ダーク</button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- トップページ -->
+  <section id="view-lp" class="view" role="tabpanel" aria-labelledby="tab-lp">
+    <div class="lp">
+      <div class="hero">
+        <div>
+          <h1 class="hero-name">sokudoku</h1>
+          <p class="hero-lead">文章を 1 文節ずつ同じ位置に出して<br>目を動かさずに読む</p>
+          <p class="hero-sub">日本語は文節ごと、英語は 1 単語ごとに切り替えて表示する速読リーダーです。速さは 1 分あたりの文字数で自分で決めます。</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" type="button" data-go="import">リーダーを開く</button>
+            <span class="tag">登録なし・無料</span>
+          </div>
+        </div>
+        <div class="hero-demo" aria-label="表示の例">
+          <div class="stage">
+            <span class="tick" aria-hidden="true"></span>
+            <div class="word is-ja" id="hero-word">吾輩は</div>
+            <span class="tick" aria-hidden="true"></span>
+          </div>
+          <div class="hero-demo-cap"><span>夏目漱石「吾輩は猫である」</span><span>600 字/分</span></div>
+        </div>
+      </div>
+
+      <section>
+        <h2 class="section-head">使い方</h2>
+        <p class="section-lead">キーボードだけで読み進められます。画面のボタンでも同じ操作ができます。</p>
+        <div class="howto">
+          <div class="howto-item"><h3>貼り付け</h3><p>読みたい文章を貼り付け欄に入れて読み始めます</p></div>
+          <div class="howto-item"><h3>ファイル</h3><p>青空文庫の txt・テキスト・DRM の無い EPUB を選ぶかドロップします</p></div>
+          <div class="howto-item"><h3>再生と停止 <kbd>space</kbd></h3><p>止めると全文が出て 今どこを読んでいたかが分かります</p></div>
+          <div class="howto-item"><h3>速度 <kbd>↑</kbd><kbd>↓</kbd></h3><p>日本語は 1 分あたりの文字数 英語は単語数で決めます</p></div>
+          <div class="howto-item"><h3>前後に移動 <kbd>←</kbd><kbd>→</kbd></h3><p>1 文ずつ戻る・進む</p></div>
+          <div class="howto-item"><h3>英文の訳 <kbd>T</kbd></h3><p>英文を読んでいる時に 今の文の日本語訳を 1 文だけ出します</p></div>
+        </div>
+      </section>
+
+      <div class="split">
+        <section>
+          <h2 class="section-head">本文はこの端末から出ません</h2>
+          <div class="section-lead">
+            <p>貼り付けた文章や選んだファイルは、ブラウザの中だけで文節に分けて表示します。サーバーには送らず、保存もしません。</p>
+            <p>英文の訳も端末内で動く Chrome の翻訳機能を使い、外部の翻訳サービスには送りません。ブラウザに残すのは速度の設定と読んでいた位置だけです。</p>
+          </div>
+        </section>
+        <section>
+          <h2 class="section-head">対応環境</h2>
+          <dl class="spec">
+            <div><dt>ブラウザ</dt><dd>Chrome・Edge・Safari・Firefox の最新版</dd></div>
+            <div><dt>英文の訳</dt><dd>デスクトップ版の Chrome</dd></div>
+            <div><dt>ファイル</dt><dd>txt (青空文庫の形式を含む)・DRM の無い EPUB</dd></div>
+            <div><dt>問い合わせ</dt><dd><a href="https://github.com/bannzai/sokudoku/issues" target="_blank" rel="noopener">https://github.com/bannzai/sokudoku/issues</a></dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <footer class="footer">
+        <span>sokudoku</span>
+        <a href="https://bannzai.github.io/sokudoku/terms/" target="_blank" rel="noopener">利用規約</a>
+        <a href="https://bannzai.github.io/sokudoku/privacy/" target="_blank" rel="noopener">プライバシーポリシー</a>
+      </footer>
+    </div>
+  </section>
+
+  <!-- 取り込み -->
+  <section id="view-import" class="view" role="tabpanel" aria-labelledby="tab-import" hidden>
+    <p class="note"><span>貼り付け欄には例文が入っています。txt を選ぶと中身が欄に入ります。読み始めるとモックでは例文を再生します</span></p>
+    <div class="appbar"><span class="appbar-name">sokudoku</span><span>文章を読み込む</span></div>
+    <div class="import">
+      <div class="resume">
+        <span>前回の続きから読む<span class="resume-meta">　吾輩は猫である　35% まで</span></span>
+        <button class="btn" type="button" data-go="play">続きから</button>
+      </div>
+      <div class="import-grid">
+        <div>
+          <label class="field-label" for="paste">文章を貼り付ける <span id="paste-count">例文</span></label>
+          <textarea id="paste" spellcheck="false">吾輩は猫である。名前はまだ無い。
+どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。吾輩はここで始めて人間というものを見た。しかもあとで聞くとそれは書生という人間中で一番獰悪な種族であったそうだ。</textarea>
+        </div>
+        <div>
+          <div class="field-label">ファイルから読む</div>
+          <div class="drop" id="drop">
+            <p class="drop-title">ここにファイルをドロップ</p>
+            <label class="btn" for="file">ファイルを選ぶ</label>
+            <input id="file" type="file" accept=".txt,.epub,text/plain,application/epub+zip" hidden>
+            <p class="drop-types">txt (青空文庫の形式を含む)・DRM の無い EPUB</p>
+            <p class="drop-status" id="drop-status" aria-live="polite"></p>
+          </div>
+        </div>
+      </div>
+      <div class="import-foot">
+        <p class="import-privacy">文章はこのブラウザの中だけで処理します。サーバーには送らず、保存もしません。</p>
+        <button class="btn btn-primary" type="button" id="start">読み始める</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 再生中 -->
+  <section id="view-play" class="view" role="tabpanel" aria-labelledby="tab-play" hidden>
+    <div class="note">
+      <span>文節が実際に切り替わります。一時停止すると一時停止中の画面に移ります</span>
+      <span class="seg" role="group" aria-label="例文">
+        <span class="seg-label">例文</span>
+        <button data-lang="ja" aria-pressed="true">日本語</button>
+        <button data-lang="en" aria-pressed="false">英語</button>
+      </span>
+    </div>
+    <div class="appbar"><span class="appbar-name">sokudoku</span><span class="appbar-title" data-bind="title"></span></div>
+    <div class="reader" id="play-reader">
+      <div class="reader-stage">
+        <div class="stage">
+          <span class="tick" aria-hidden="true"></span>
+          <div class="word" id="play-word" aria-live="off"></div>
+          <span class="tick" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="progress" aria-hidden="true"><span id="play-progress"></span></div>
+        <div class="controls-row">
+          <div class="controls-group">
+            <button class="btn btn-quiet" type="button" data-act="slower" aria-label="遅くする">遅く <kbd>↓</kbd></button>
+            <span class="readout"><strong data-bind="speed"></strong> <span data-bind="unit"></span></span>
+            <button class="btn btn-quiet" type="button" data-act="faster" aria-label="速くする">速く <kbd>↑</kbd></button>
+          </div>
+          <button class="btn btn-primary" type="button" data-act="toggle" id="play-toggle">一時停止 <kbd>space</kbd></button>
+          <span class="readout" data-bind="position"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 一時停止中 -->
+  <section id="view-pause" class="view" role="tabpanel" aria-labelledby="tab-pause" hidden>
+    <div class="note">
+      <span>文節をクリックするとそこから再開します</span>
+      <span class="seg" role="group" aria-label="例文">
+        <span class="seg-label">例文</span>
+        <button data-lang="ja" aria-pressed="true">日本語</button>
+        <button data-lang="en" aria-pressed="false">英語</button>
+      </span>
+    </div>
+    <div class="appbar"><span class="appbar-name">sokudoku</span><span class="appbar-title" data-bind="title"></span></div>
+    <div class="paused">
+      <div class="paused-meta"><span>一時停止中</span><span class="readout" data-bind="position"></span></div>
+      <div class="fulltext" id="fulltext"></div>
+      <p class="paused-hint">読みたい位置の文節を選ぶとそこから再開します</p>
+      <div class="controls">
+        <div class="controls-row">
+          <div class="controls-group">
+            <button class="btn" type="button" data-act="prev"><kbd>←</kbd> 前の文</button>
+            <button class="btn" type="button" data-act="next">次の文 <kbd>→</kbd></button>
+          </div>
+          <button class="btn btn-primary" type="button" data-act="toggle">再開 <kbd>space</kbd></button>
+          <div class="controls-group">
+            <button class="btn btn-quiet" type="button" data-act="slower" aria-label="遅くする">遅く <kbd>↓</kbd></button>
+            <span class="readout"><strong data-bind="speed"></strong> <span data-bind="unit"></span></span>
+            <button class="btn btn-quiet" type="button" data-act="faster" aria-label="速くする">速く <kbd>↑</kbd></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 英文の訳 -->
+  <section id="view-translate" class="view" role="tabpanel" aria-labelledby="tab-translate" hidden>
+    <p class="note"><span>訳はモック用に用意した例です。本実装では Chrome の端末内翻訳で今の文を訳します</span></p>
+    <div class="appbar"><span class="appbar-name">sokudoku</span><span class="appbar-title">Pride and Prejudice</span></div>
+    <div class="reader" id="tr-reader">
+      <div class="reader-stage">
+        <div class="stage">
+          <span class="tick" aria-hidden="true"></span>
+          <div class="word" id="tr-word"></div>
+          <span class="tick" aria-hidden="true"></span>
+        </div>
+        <p class="translation" id="tr-text" aria-live="polite"></p>
+      </div>
+      <div class="controls">
+        <div class="progress" aria-hidden="true"><span id="tr-progress"></span></div>
+        <div class="controls-row">
+          <div class="controls-group">
+            <button class="btn btn-quiet" type="button" data-tr="slower" aria-label="遅くする">遅く <kbd>↓</kbd></button>
+            <span class="readout"><strong id="tr-speed"></strong> 語/分</span>
+            <button class="btn btn-quiet" type="button" data-tr="faster" aria-label="速くする">速く <kbd>↑</kbd></button>
+          </div>
+          <div class="controls-group">
+            <button class="btn" type="button" data-tr="translate" id="tr-toggle" aria-pressed="true">訳を隠す <kbd>T</kbd></button>
+            <button class="btn btn-primary" type="button" data-tr="toggle" id="tr-play">一時停止 <kbd>space</kbd></button>
+          </div>
+          <span class="readout" id="tr-position"></span>
+        </div>
+      </div>
+      <div class="unavailable">
+        <p class="unavailable-head">訳を使えない環境での表示</p>
+        <div class="unavailable-row">
+          <button class="btn" type="button" disabled aria-describedby="tr-reason">訳を出す <kbd>T</kbd></button>
+          <p class="unavailable-reason" id="tr-reason">このブラウザでは訳を使えません。訳は端末内で翻訳する Chrome の機能を使うため、デスクトップ版の Chrome で開いてください。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 読了 -->
+  <section id="view-done" class="view" role="tabpanel" aria-labelledby="tab-done" hidden>
+    <p class="note"><span id="done-note">例の数値です。再生中の画面で最後まで読むと、その回の実測値に置き換わります</span></p>
+    <div class="done">
+      <div>
+        <h1 class="done-title">読み終わりました</h1>
+        <p class="done-work" id="done-work">吾輩は猫である (全文)</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">読んだ時間</span><span class="stat-value" id="done-time">3<small>時間</small>52<small>分</small></span></div>
+        <div class="stat"><span class="stat-label">実効速度</span><span class="stat-value" id="done-speed">1,462<small>字/分</small></span></div>
+        <div class="stat"><span class="stat-label">読んだ文字数</span><span class="stat-value" id="done-chars">339,480<small>字</small></span></div>
+      </div>
+      <p class="done-note">実効速度は、一時停止していた時間を除いた再生時間で文字数を割った値です。句読点での間を含むため、設定した速度より少し遅くなります。</p>
+      <div class="done-actions">
+        <button class="btn btn-primary" type="button" id="again">最初から読み直す</button>
+        <button class="btn" type="button" data-go="import">別の文章を読む</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  /** 例文。日本語は青空文庫の夏目漱石「吾輩は猫である」冒頭を文節に区切ったもの (段落ごとの配列) */
+  const JA_PARAGRAPHS = [
+    ["吾輩は", "猫である。", "名前は", "まだ", "無い。"],
+    ["どこで", "生れたか", "とんと", "見当が", "つかぬ。", "何でも", "薄暗い", "じめじめした", "所で", "ニャーニャー", "泣いて", "いた事だけは", "記憶している。", "吾輩は", "ここで", "始めて", "人間という", "ものを", "見た。", "しかも", "あとで", "聞くと", "それは", "書生という", "人間中で", "一番", "獰悪な", "種族で", "あったそうだ。"],
+  ];
+  /** 例文。英語は Project Gutenberg の Jane Austen "Pride and Prejudice" 冒頭 2 文 */
+  const EN_PARAGRAPHS = [
+    "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+    "However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered the rightful property of some one or other of their daughters.",
+  ].map((paragraph) => paragraph.split(" "));
+  /** 英文の各文の訳。本実装では Chrome の Translator API が端末内で出す。モックでは手で用意した例 */
+  const EN_TRANSLATIONS = [
+    "財産のある独身の男性なら妻を欲しがっているに違いないというのは、誰もが認める真理である。",
+    "そういう男性が近所に越してきたばかりで本人の気持ちや考えがほとんど知られていなくても、この真理は周りの家々の心にしっかり根づいているので、彼はその家の娘たちの誰かのものになって当然の相手とみなされる。",
+  ];
+
+  const TEXTS = {
+    ja: { title: "吾輩は猫である", paragraphs: JA_PARAGRAPHS, unit: "字/分", perChar: true },
+    en: { title: "Pride and Prejudice", paragraphs: EN_PARAGRAPHS, unit: "語/分", perChar: false },
+  };
+  // 日本語の黙読は 400〜600 字/分 程度とされる。RSVP で少し速めに感じる上限側から始める
+  const DEFAULT_JA_SPEED = 600;
+  // 英語の黙読の平均 (約 240 語/分) より少し速い値から始める
+  const DEFAULT_EN_SPEED = 300;
+  const SPEED_STEP = { ja: 50, en: 25 };
+
+  /** 文節の文字数。句読点・括弧は表示時間の文字数に数えない */
+  function countChars(chunk) {
+    return chunk.replace(/[、。，．,.!?！？「」『』:;]/g, "").length;
+  }
+
+  /** 1 文節 (単語) の表示時間 (ms)。間を延ばすのは句読点だけ (ADR 0002) */
+  function chunkDuration(chunk, perChar, speed) {
+    const base = perChar ? (Math.max(countChars(chunk), 1) * 60000) / speed : 60000 / speed;
+    if (/[。．.!?！？]$/.test(chunk)) return base * 2;
+    if (/[、，,;:]$/.test(chunk)) return base * 1.5;
+    return base;
+  }
+
+  /** 段落の配列から、再生に使う文節の列と各文節の文番号・段落番号を作る */
+  function flatten(paragraphs) {
+    const chunks = [];
+    let sentence = 0;
+    paragraphs.forEach((paragraph, paragraphIndex) => {
+      paragraph.forEach((text) => {
+        chunks.push({ text, sentence, paragraph: paragraphIndex });
+        if (/[。．.!?！？]$/.test(text)) sentence += 1;
+      });
+    });
+    return chunks;
+  }
+
+  /**
+   * 1 つの文章を 1 文節ずつ再生する。表示の更新は onChange、最後まで読んだ時は onEnd に任せる
+   */
+  function createReader({ text, speed, onChange, onEnd }) {
+    const reader = {
+      text,
+      chunks: flatten(text.paragraphs),
+      index: 0,
+      speed,
+      playing: false,
+      playedMs: 0,
+    };
+    let timer = null;
+    let playStartedAt = 0;
+
+    function schedule() {
+      clearTimeout(timer);
+      if (!reader.playing) return;
+      timer = setTimeout(() => {
+        if (reader.index >= reader.chunks.length - 1) {
+          pause();
+          onEnd && onEnd(reader);
+          return;
+        }
+        reader.index += 1;
+        onChange(reader);
+        schedule();
+      }, chunkDuration(reader.chunks[reader.index].text, text.perChar, reader.speed));
+    }
+    function play() {
+      if (reader.playing) return;
+      if (reader.index >= reader.chunks.length - 1) {
+        reader.index = 0;
+        reader.playedMs = 0;
+      }
+      reader.playing = true;
+      playStartedAt = performance.now();
+      onChange(reader);
+      schedule();
+    }
+    function pause() {
+      if (!reader.playing) return;
+      reader.playing = false;
+      reader.playedMs += performance.now() - playStartedAt;
+      clearTimeout(timer);
+      onChange(reader);
+    }
+    function seek(index) {
+      reader.index = Math.max(0, Math.min(index, reader.chunks.length - 1));
+      onChange(reader);
+      schedule();
+    }
+    /** 文単位で前後へ移動する。戻る時は今の文の先頭、先頭にいれば 1 つ前の文の先頭へ */
+    function stepSentence(direction) {
+      const current = reader.chunks[reader.index].sentence;
+      const firstOf = (sentence) => reader.chunks.findIndex((chunk) => chunk.sentence === sentence);
+      if (direction > 0) {
+        const next = firstOf(current + 1);
+        seek(next === -1 ? reader.chunks.length - 1 : next);
+        return;
+      }
+      const head = firstOf(current);
+      seek(reader.index > head ? head : Math.max(firstOf(current - 1), 0));
+    }
+    // 下限は内容を追える遅さ、上限は RSVP でも文節を読み取れる速さの目安としてモック用に置いた値
+    function changeSpeed(delta) {
+      const [min, max] = reader.text.perChar ? [200, 2000] : [100, 900];
+      reader.speed = Math.max(min, Math.min(reader.speed + delta, max));
+      onChange(reader);
+    }
+    function remainingMs() {
+      return reader.chunks
+        .slice(reader.index)
+        .reduce((sum, chunk) => sum + chunkDuration(chunk.text, reader.text.perChar, reader.speed), 0);
+    }
+    return Object.assign(reader, { play, pause, seek, stepSentence, changeSpeed, remainingMs, toggle: () => (reader.playing ? pause() : play()) });
+  }
+
+  /** 残り時間を「残り約 N 分」「残り N 秒」の形にする */
+  function formatRemaining(ms) {
+    const seconds = Math.ceil(ms / 1000);
+    return seconds >= 60 ? `残り約 ${Math.round(seconds / 60)} 分` : `残り ${seconds} 秒`;
+  }
+
+  /** 長い英単語が狭い画面で横にはみ出さないよう、文字数で文字サイズを下げる */
+  function setWord(element, chunkText, isJa) {
+    element.textContent = chunkText;
+    element.classList.toggle("is-ja", isJa);
+    element.classList.toggle("is-long", chunkText.length > (isJa ? 7 : 11));
+  }
+
+  const views = ["lp", "import", "play", "pause", "translate", "done"];
+  let currentView = "lp";
+  const speeds = { ja: DEFAULT_JA_SPEED, en: DEFAULT_EN_SPEED };
+  let lang = "ja";
+  let main = null;
+
+  function renderMain(reader) {
+    const chunk = reader.chunks[reader.index];
+    setWord(document.getElementById("play-word"), chunk.text, lang === "ja");
+    document.getElementById("play-progress").style.width = `${((reader.index + 1) / reader.chunks.length) * 100}%`;
+    document.getElementById("play-reader").classList.toggle("is-playing", reader.playing);
+    document.getElementById("play-toggle").innerHTML = reader.playing ? "一時停止 <kbd>space</kbd>" : "再生 <kbd>space</kbd>";
+    const percent = Math.round(((reader.index + 1) / reader.chunks.length) * 100);
+    document.querySelectorAll('[data-bind="speed"]').forEach((element) => (element.textContent = reader.speed));
+    document.querySelectorAll('[data-bind="unit"]').forEach((element) => (element.textContent = reader.text.unit));
+    document.querySelectorAll('[data-bind="title"]').forEach((element) => (element.textContent = reader.text.title));
+    document.querySelectorAll('[data-bind="position"]').forEach((element) => (element.textContent = `${percent}%　${formatRemaining(reader.remainingMs())}`));
+    document.querySelectorAll("#fulltext .chunk").forEach((element) => element.classList.toggle("is-current", Number(element.dataset.index) === reader.index));
+    speeds[lang] = reader.speed;
+  }
+
+  /** 一時停止中の全文。文節ごとに span を作り、クリックでその位置から再開する */
+  function buildFulltext(reader) {
+    const container = document.getElementById("fulltext");
+    container.classList.toggle("is-en", lang === "en");
+    container.replaceChildren();
+    let paragraphElement = null;
+    reader.chunks.forEach((chunk, index) => {
+      if (!paragraphElement || chunk.paragraph !== Number(paragraphElement.dataset.paragraph)) {
+        paragraphElement = document.createElement("p");
+        paragraphElement.dataset.paragraph = chunk.paragraph;
+        container.append(paragraphElement);
+      } else if (lang === "en") {
+        paragraphElement.append(" ");
+      }
+      const span = document.createElement("span");
+      span.className = "chunk";
+      span.dataset.index = index;
+      span.textContent = chunk.text;
+      span.addEventListener("click", () => {
+        main.seek(index);
+        showView("play");
+        main.play();
+      });
+      paragraphElement.append(span);
+    });
+  }
+
+  function finish(reader) {
+    const chars = reader.chunks.reduce((sum, chunk) => sum + (reader.text.perChar ? countChars(chunk.text) : 1), 0);
+    const seconds = Math.max(Math.round(reader.playedMs / 1000), 1);
+    const perMinute = Math.round(chars / (reader.playedMs / 60000));
+    document.getElementById("done-note").textContent = "再生中の画面で最後まで読んだ回の実測値です";
+    document.getElementById("done-work").textContent = `${reader.text.title} (冒頭)`;
+    document.getElementById("done-time").innerHTML = seconds >= 60 ? `${Math.floor(seconds / 60)}<small>分</small>${seconds % 60}<small>秒</small>` : `${seconds}<small>秒</small>`;
+    document.getElementById("done-speed").innerHTML = `${perMinute.toLocaleString("ja-JP")}<small>${reader.text.unit}</small>`;
+    document.getElementById("done-chars").innerHTML = `${chars.toLocaleString("ja-JP")}<small>${reader.text.perChar ? "字" : "語"}</small>`;
+    showView("done");
+  }
+
+  function loadMain(nextLang) {
+    if (main) main.pause();
+    lang = nextLang;
+    main = createReader({ text: TEXTS[lang], speed: speeds[lang], onChange: renderMain, onEnd: finish });
+    buildFulltext(main);
+    renderMain(main);
+    document.querySelectorAll("[data-lang]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.lang === lang)));
+  }
+
+  // 英文の訳の画面
+  let showTranslation = true;
+  function renderTranslate(reader) {
+    const chunk = reader.chunks[reader.index];
+    setWord(document.getElementById("tr-word"), chunk.text, false);
+    document.getElementById("tr-progress").style.width = `${((reader.index + 1) / reader.chunks.length) * 100}%`;
+    document.getElementById("tr-reader").classList.toggle("is-playing", reader.playing);
+    document.getElementById("tr-play").innerHTML = reader.playing ? "一時停止 <kbd>space</kbd>" : "再生 <kbd>space</kbd>";
+    document.getElementById("tr-speed").textContent = reader.speed;
+    document.getElementById("tr-position").textContent = `${Math.round(((reader.index + 1) / reader.chunks.length) * 100)}%　${formatRemaining(reader.remainingMs())}`;
+    const translation = document.getElementById("tr-text");
+    translation.replaceChildren();
+    if (showTranslation) {
+      const label = document.createElement("span");
+      label.className = "translation-label";
+      label.textContent = "今の文の訳";
+      translation.append(label, EN_TRANSLATIONS[chunk.sentence]);
+    }
+    const toggle = document.getElementById("tr-toggle");
+    toggle.innerHTML = showTranslation ? "訳を隠す <kbd>T</kbd>" : "訳を出す <kbd>T</kbd>";
+    toggle.setAttribute("aria-pressed", String(showTranslation));
+  }
+  const translateReader = createReader({
+    text: TEXTS.en,
+    speed: DEFAULT_EN_SPEED,
+    onChange: renderTranslate,
+    onEnd: (reader) => {
+      reader.seek(0);
+      reader.play();
+    },
+  });
+
+  function showView(name) {
+    currentView = name;
+    views.forEach((view) => {
+      document.getElementById(`view-${view}`).hidden = view !== name;
+      document.getElementById(`tab-${view}`).setAttribute("aria-selected", String(view === name));
+    });
+    if (name !== "play") main.pause();
+    if (name !== "translate") translateReader.pause();
+    if (name === "play") main.play();
+    if (name === "translate") translateReader.play();
+    if (name === "pause") renderMain(main);
+    try {
+      if (location.hash !== `#${name}`) history.replaceState(null, "", `#${name}`);
+    } catch {
+      // URL を書き換えられない環境でも画面の切り替えは続ける
+    }
+    window.scrollTo({ top: 0 });
+  }
+
+  function mainAction(action) {
+    if (action === "toggle") {
+      if (main.playing) {
+        main.pause();
+        showView("pause");
+      } else {
+        showView("play");
+      }
+    }
+    if (action === "prev") main.stepSentence(-1);
+    if (action === "next") main.stepSentence(1);
+    if (action === "slower") main.changeSpeed(-SPEED_STEP[lang]);
+    if (action === "faster") main.changeSpeed(SPEED_STEP[lang]);
+  }
+
+  function translateAction(action) {
+    if (action === "toggle") translateReader.toggle();
+    if (action === "translate") {
+      showTranslation = !showTranslation;
+      renderTranslate(translateReader);
+    }
+    if (action === "prev") translateReader.stepSentence(-1);
+    if (action === "next") translateReader.stepSentence(1);
+    if (action === "slower") translateReader.changeSpeed(-SPEED_STEP.en);
+    if (action === "faster") translateReader.changeSpeed(SPEED_STEP.en);
+  }
+
+  // モックの切り替えボタンはクリック後にフォーカスを外す。残ると space でそのボタンが再度押され、一時停止の操作と重なるため
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest && event.target.closest("[data-view], [data-go], [data-lang], [data-theme-choice]");
+    if (button) button.blur();
+  });
+  document.querySelectorAll("[data-view]").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
+  document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.go)));
+  document.querySelectorAll("[data-act]").forEach((button) => button.addEventListener("click", () => mainAction(button.dataset.act)));
+  document.querySelectorAll("[data-tr]").forEach((button) => button.addEventListener("click", () => translateAction(button.dataset.tr)));
+  document.querySelectorAll("[data-lang]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const wasPlaying = currentView === "play";
+      loadMain(button.dataset.lang);
+      if (wasPlaying) main.play();
+    }),
+  );
+  document.getElementById("start").addEventListener("click", () => {
+    loadMain("ja");
+    showView("play");
+  });
+  document.getElementById("again").addEventListener("click", () => {
+    main.seek(0);
+    main.playedMs = 0;
+    showView("play");
+  });
+
+  const KEY_ACTIONS = { " ": "toggle", ArrowLeft: "prev", ArrowRight: "next", ArrowUp: "faster", ArrowDown: "slower" };
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (target.closest && target.closest("textarea, input")) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    // 再生操作のボタンにフォーカスがある時の space はボタン自身のクリックに任せる (二重に切り替わらないため)
+    if (event.key === " " && target.closest && target.closest("[data-act], [data-tr]")) return;
+    if (currentView === "play" || currentView === "pause") {
+      const action = KEY_ACTIONS[event.key];
+      if (!action) return;
+      event.preventDefault();
+      mainAction(action);
+    }
+    if (currentView === "translate") {
+      const action = event.key === "t" || event.key === "T" ? "translate" : KEY_ACTIONS[event.key];
+      if (!action) return;
+      event.preventDefault();
+      translateAction(action);
+    }
+  });
+
+  // 取り込み: 貼り付け欄の文字数とファイルの読み込み
+  const paste = document.getElementById("paste");
+  paste.addEventListener("input", () => {
+    document.getElementById("paste-count").textContent = `${paste.value.replace(/\s/g, "").length.toLocaleString("ja-JP")} 字`;
+  });
+  /** txt を読む。UTF-8 で読めない時は青空文庫で多い Shift_JIS として読み直す */
+  async function readTextFile(file) {
+    const buffer = await file.arrayBuffer();
+    const utf8 = new TextDecoder("utf-8").decode(buffer);
+    return utf8.includes("\uFFFD") ? new TextDecoder("shift_jis").decode(buffer) : utf8;
+  }
+  async function takeFile(file) {
+    const status = document.getElementById("drop-status");
+    if (!file) return;
+    if (/\.epub$/i.test(file.name)) {
+      status.textContent = `${file.name} を選びました。EPUB の読み込みはモックでは動きません`;
+      return;
+    }
+    paste.value = await readTextFile(file);
+    paste.dispatchEvent(new Event("input"));
+    status.textContent = `${file.name} を貼り付け欄に読み込みました`;
+  }
+  document.getElementById("file").addEventListener("change", (event) => takeFile(event.target.files[0]));
+  const drop = document.getElementById("drop");
+  drop.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    drop.classList.add("is-over");
+  });
+  drop.addEventListener("dragleave", () => drop.classList.remove("is-over"));
+  drop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    drop.classList.remove("is-over");
+    takeFile(event.dataTransfer.files[0]);
+  });
+
+  // 配色の切り替え。モックで両方の配色を見比べるため、ルート要素の data-theme を直接書き換える
+  document.querySelectorAll("[data-theme-choice]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const choice = button.dataset.themeChoice;
+      if (choice === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", choice);
+      document.querySelectorAll("[data-theme-choice]").forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+    }),
+  );
+
+  // トップページの表示例。動きを減らす設定の時は最初の文節で止めておく
+  const heroChunks = flatten(JA_PARAGRAPHS);
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    let heroIndex = 0;
+    const heroWord = document.getElementById("hero-word");
+    const heroStep = () => {
+      heroIndex = (heroIndex + 1) % heroChunks.length;
+      setWord(heroWord, heroChunks[heroIndex].text, true);
+      setTimeout(heroStep, chunkDuration(heroChunks[heroIndex].text, true, DEFAULT_JA_SPEED) + (heroIndex === heroChunks.length - 1 ? 1200 : 0));
+    };
+    setTimeout(heroStep, chunkDuration(heroChunks[0].text, true, DEFAULT_JA_SPEED));
+  }
+
+  loadMain("ja");
+  renderTranslate(translateReader);
+  const initialView = location.hash.slice(1);
+  showView(views.includes(initialView) ? initialView : "lp");
+</script>
