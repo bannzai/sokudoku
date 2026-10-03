@@ -36,12 +36,10 @@
   margin-top: 4px;
 }
 
-/* 長い URL を含む表が狭い幅でページごと横に広がらないよう、表の中だけを横にスクロールさせる */
+/* display を変えると一部の読み上げで表の構造が失われるため table のまま置き、はみ出しはセルの中の折り返しで防ぐ */
 .legal table {
-  display: block;
-  max-width: 100%;
+  width: 100%;
   margin: 0 0 12px;
-  overflow-x: auto;
   font-size: 14px;
   border-collapse: collapse;
 }
@@ -52,4 +50,6 @@
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--color-border);
+  /* 長い URL が狭い幅で表ごとページを横に広げないよう、収まらない時だけ途中で折り返す */
+  overflow-wrap: anywhere;
 }
