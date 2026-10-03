@@ -89,7 +89,7 @@ export default function HomePage() {
         </p>
         {/* source: https://developer.chrome.com/docs/ai/translator-api : 「The API is built into Chrome, and the model is downloaded the first time a website uses this API.」「client-side translation」 */}
         <p>
-          英文の訳 (準備中) も、ブラウザ (Google Chrome) に内蔵された翻訳機能で端末上で行います。速度などの設定と読書の位置はこのブラウザのストレージにだけ保存され、サイトデータを消去するといつでも消せます。
+          英文の訳 (準備中) も、ブラウザ (Google Chrome) に内蔵された翻訳機能で端末上で行います。速度などの設定、読書の位置、読んだ量の記録はこのブラウザのストレージにだけ保存され、サイトデータを消去するといつでも消せます。本文そのものはこのブラウザにも保存しません。
         </p>
       </section>
 
