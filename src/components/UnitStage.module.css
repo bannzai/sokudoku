@@ -30,6 +30,8 @@
   color: var(--color-text);
   text-align: center;
   letter-spacing: 0.02em;
+  /* letter-spacing は最後の文字の後ろにも付き、見た目の中心が左へずれるため、同じ幅を先頭に足して中央にそろえる */
+  text-indent: 0.02em;
   /* 狭い画面で長い英単語が横にはみ出さないよう、収まらない時だけ折り返す */
   overflow-wrap: anywhere;
 }
@@ -37,4 +39,5 @@
 .japanese {
   font-family: var(--font-read-ja);
   letter-spacing: 0.06em;
+  text-indent: 0.06em;
 }

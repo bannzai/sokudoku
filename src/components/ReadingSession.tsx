@@ -594,7 +594,7 @@ export function ReadingSession({
                       onMouseDown={keepFocusOffButton}
                       onClick={() => setReaderState(stepSpeed(readerState, [language], -1))}
                       disabled={readerState.speed[speedKey] <= speedLimits[speedKey].min}
-                      aria-label={`${languageName}の速度を下げる`}
+                      aria-label={`遅く (${languageName}の速度を下げる)`}
                     >
                       遅く <kbd>↓</kbd>
                     </button>
@@ -607,7 +607,7 @@ export function ReadingSession({
                       onMouseDown={keepFocusOffButton}
                       onClick={() => setReaderState(stepSpeed(readerState, [language], 1))}
                       disabled={readerState.speed[speedKey] >= speedLimits[speedKey].max}
-                      aria-label={`${languageName}の速度を上げる`}
+                      aria-label={`速く (${languageName}の速度を上げる)`}
                     >
                       速く <kbd>↑</kbd>
                     </button>

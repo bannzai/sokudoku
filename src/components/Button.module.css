@@ -51,7 +51,7 @@
   border-color: transparent;
 }
 
-.quiet:hover {
+.quiet:hover:not(:disabled) {
   color: var(--color-text);
   border-color: var(--color-border);
 }
