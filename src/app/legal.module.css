@@ -35,3 +35,21 @@
 .legal li + li {
   margin-top: 4px;
 }
+
+/* 長い URL を含む表が狭い幅でページごと横に広がらないよう、表の中だけを横にスクロールさせる */
+.legal table {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  font-size: 14px;
+  border-collapse: collapse;
+}
+
+.legal th,
+.legal td {
+  padding: 6px 12px 6px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border);
+}

@@ -51,6 +51,12 @@
   border-color: transparent;
 }
 
+/* 控えめなボタンは無効でも面と枠を出さず、文字の色だけで無効を示す */
+.quiet:disabled {
+  background: transparent;
+  border-color: transparent;
+}
+
 .quiet:hover:not(:disabled) {
   color: var(--color-text);
   border-color: var(--color-border);

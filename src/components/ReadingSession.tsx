@@ -229,7 +229,7 @@ function FinishedScreen({ readerState, finishedReadings, englishReadingDays, onR
   const englishReadingDaysSummary = summarizeEnglishReadingDays(englishReadingDays, readerState.finishedAt ?? 0);
   return (
     <>
-      <AppBar />
+      <AppBar linksToTop={false} />
       <main className={styles.finished}>
         <h1 className={styles.title}>読了</h1>
         <dl className={styles.stats}>
@@ -551,7 +551,7 @@ export function ReadingSession({
   const notice = translatorNotice(translationState);
   return (
     <>
-      <AppBar description={isPlaying ? "再生中" : "一時停止中"} />
+      <AppBar description={isPlaying ? "再生中" : "一時停止中"} linksToTop={false} />
       <main className={isPlaying ? `${styles.session} ${styles.playing}` : styles.session}>
         <button
           type="button"
