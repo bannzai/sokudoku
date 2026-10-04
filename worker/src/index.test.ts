@@ -179,6 +179,18 @@ describe("handleRequest", () => {
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
 
+  it("同じオリジンの Disallow のパスへのリダイレクトを 403 の robots-disallowed にし、転送先を取得しない", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": () => new Response("User-agent: *\nDisallow: /private/\n"),
+      "https://example.com/public": () => new Response(null, { status: 302, headers: { Location: "/private/article" } }),
+    });
+    const response = await handleRequest(extractRequest("https://example.com/public"), fakeEnv(), fetchPage);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "robots-disallowed" });
+    expect(fetchPage.mock.calls.map(([input]) => input.toString())).not.toContain("https://example.com/private/article");
+    expect(fetchPage.mock.calls.filter(([input]) => input.toString() === "https://example.com/robots.txt")).toHaveLength(1);
+  });
+
   it("robots.txt が 5xx のサイトは取得せず 502 の page-unavailable にする", async () => {
     const fetchPage = fakeFetch({
       "https://example.com/robots.txt": () => new Response("error", { status: 503 }),
@@ -257,6 +269,18 @@ describe("decodeHtml", () => {
     // 「速読」の EUC-JP のバイト列
     const bytes = new Uint8Array([...head, 0xc2, 0xae, 0xc6, 0xc9]);
     expect(decodeHtml(bytes, "text/html")).toContain("速読");
+  });
+
+  it("charset の無い meta が先にあっても、後の meta の charset で読む", () => {
+    const head = new TextEncoder().encode('<meta name="viewport" content="width=device-width"><meta charset="Shift_JIS">');
+    expect(decodeHtml(new Uint8Array([...head, 0x91, 0xac, 0x93, 0xc7]), "text/html")).toContain("速読");
+  });
+
+  it("<meta が繰り返される先頭部分でも短い時間で読み終える", () => {
+    const bytes = new TextEncoder().encode("<meta".repeat(5000));
+    const start = performance.now();
+    decodeHtml(bytes, "text/html");
+    expect(performance.now() - start).toBeLessThan(500);
   });
 
   it("charset が無い・未対応の名前なら UTF-8 で読む", () => {

@@ -39,6 +39,16 @@ describe("isAllowedByRobots", () => {
     expect(isAllowedByRobots("User-agent: *\nDisallow: /a\nAllow: /a\n", "sokudoku-extract", "/a")).toBe(true);
   });
 
+  it("ASCII 以外の文字とパーセントエンコードの表記を揃えてから比べる (RFC 9309 2.2.2)", () => {
+    // URL の pathname は ASCII 以外をエンコード済みで渡る
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /非公開/\n", "sokudoku-extract", "/%E9%9D%9E%E5%85%AC%E9%96%8B/a")).toBe(false);
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /%e9%9d%9e%e5%85%ac%e9%96%8b/\n", "sokudoku-extract", "/%E9%9D%9E%E5%85%AC%E9%96%8B/a")).toBe(false);
+    // 非予約文字のエンコードで Disallow を避けられない
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /private/\n", "sokudoku-extract", "/%70rivate/a")).toBe(false);
+    // 予約文字のエンコードは別の文字として扱う
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /a/b\n", "sokudoku-extract", "/a%2Fb")).toBe(true);
+  });
+
   it("* と末尾の $ を解釈し、コメントを無視する", () => {
     const robotsText = "User-agent: * # すべて\nDisallow: /*.pdf$ # PDF\nDisallow: /search?*q=\n";
     expect(isAllowedByRobots(robotsText, "sokudoku-extract", "/files/a.pdf")).toBe(false);

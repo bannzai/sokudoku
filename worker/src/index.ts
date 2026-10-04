@@ -63,11 +63,14 @@ class ExtractFailure extends Error {
   }
 }
 
-export default {
+/** Workers が呼ぶ入口。取得には Workers の fetch を使う */
+const worker = {
   fetch(request: Request, env: Env): Promise<Response> {
     return handleRequest(request, env, fetch);
   },
 };
+
+export default worker;
 
 /**
  * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
@@ -116,11 +119,16 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
  * 転送先も含め、取得するすべての URL について取得先の検査と robots.txt の確認を行う。失敗は ExtractFailure を投げる
  */
 async function fetchPageAllowedByRobots(url: URL, fetchPage: typeof fetch, signal: AbortSignal): Promise<string> {
-  const robotsAllowedOrigins = new Set<string>();
+  // 同じオリジンへの転送でも転送先のパスで判定し直すため、オリジンごとに robots.txt の本文 (無ければ "") を持ち回る
+  const robotsTextByOrigin = new Map<string, string>();
   const response = await fetchFollowingRedirects(url, fetchPage, signal, async (hopUrl) => {
-    if (!robotsAllowedOrigins.has(hopUrl.origin)) {
-      await assertAllowedByRobots(hopUrl, fetchPage, signal);
-      robotsAllowedOrigins.add(hopUrl.origin);
+    let robotsText = robotsTextByOrigin.get(hopUrl.origin);
+    if (robotsText === undefined) {
+      robotsText = await fetchRobotsText(hopUrl, fetchPage, signal);
+      robotsTextByOrigin.set(hopUrl.origin, robotsText);
+    }
+    if (!isAllowedByRobots(robotsText, robotsUserAgentToken, `${hopUrl.pathname}${hopUrl.search}`)) {
+      throw new ExtractFailure("robots-disallowed");
     }
   });
   if (!response.ok) {
@@ -138,10 +146,10 @@ async function fetchPageAllowedByRobots(url: URL, fetchPage: typeof fetch, signa
 }
 
 /**
- * hopUrl のオリジンの robots.txt が、この Worker に hopUrl の取得を許すかを確かめ、許さなければ ExtractFailure を投げる。
- * RFC 9309 に従い、robots.txt が 4xx なら制限なし、5xx・接続の失敗なら取得しない
+ * hopUrl のオリジンの robots.txt の本文を返す。RFC 9309 に従い、robots.txt が 4xx なら制限なしとして空文字を返し、
+ * 5xx・接続の失敗なら取得しないため ExtractFailure を投げる
  */
-async function assertAllowedByRobots(hopUrl: URL, fetchPage: typeof fetch, signal: AbortSignal): Promise<void> {
+async function fetchRobotsText(hopUrl: URL, fetchPage: typeof fetch, signal: AbortSignal): Promise<string> {
   let response: Response;
   try {
     response = await fetchFollowingRedirects(new URL("/robots.txt", hopUrl), fetchPage, signal, async () => {});
@@ -152,7 +160,8 @@ async function assertAllowedByRobots(hopUrl: URL, fetchPage: typeof fetch, signa
     throw new ExtractFailure("page-unavailable");
   }
   if (response.status >= 400 && response.status < 500) {
-    return;
+    await response.body?.cancel();
+    return "";
   }
   if (!response.ok) {
     throw new ExtractFailure("page-unavailable");
@@ -162,9 +171,7 @@ async function assertAllowedByRobots(hopUrl: URL, fetchPage: typeof fetch, signa
   if (!bytes) {
     throw new ExtractFailure("robots-disallowed");
   }
-  if (!isAllowedByRobots(new TextDecoder().decode(bytes), robotsUserAgentToken, `${hopUrl.pathname}${hopUrl.search}`)) {
-    throw new ExtractFailure("robots-disallowed");
-  }
+  return new TextDecoder().decode(bytes);
 }
 
 /**
@@ -245,14 +252,35 @@ export function decodeHtml(bytes: Uint8Array, contentType: string): string {
   // meta を探す範囲は、HTML の仕様が prescan に使う先頭 1024 バイトに、head の前に長いコメント等を置くページの分の余裕をみた 4 KB。
   // 宣言が無いページの既定は、現在の Web のページの大半を占める UTF-8 にする
   const charset =
-    /charset\s*=\s*["']?([\w.:-]+)/i.exec(contentType)?.[1] ??
-    /<meta[^>]+charset\s*=\s*["']?([\w.:-]+)/i.exec(new TextDecoder().decode(bytes.subarray(0, 4096)))?.[1] ??
+    charsetParameter(contentType) ??
+    metaTags(new TextDecoder().decode(bytes.subarray(0, 4096)))
+      .map(charsetParameter)
+      .find((metaCharset) => metaCharset !== undefined) ??
     "utf-8";
   try {
     return new TextDecoder(charset).decode(bytes);
   } catch {
     return new TextDecoder().decode(bytes);
   }
+}
+
+/** Content-Type や meta 要素の文字列から charset の値を取り出す。無ければ undefined を返す */
+function charsetParameter(text: string): string | undefined {
+  return /charset\s*=\s*["']?([\w.:-]+)/i.exec(text)?.[1];
+}
+
+/**
+ * HTML の先頭部分から meta 要素の開始タグ (<meta から次の > まで) を順に取り出す。
+ * 1 つの正規表現で meta と charset をまとめて探すと、<meta が繰り返される入力で照合が多項式時間になるため、タグごとに切り出す
+ */
+function metaTags(htmlHead: string): string[] {
+  const lowerHtmlHead = htmlHead.toLowerCase();
+  const tags: string[] = [];
+  for (let start = lowerHtmlHead.indexOf("<meta"); start !== -1; start = lowerHtmlHead.indexOf("<meta", start + 1)) {
+    const end = lowerHtmlHead.indexOf(">", start);
+    tags.push(htmlHead.slice(start, end === -1 ? undefined : end));
+  }
+  return tags;
 }
 
 /** JSON のレスポンスのヘッダー。origin が許可したオリジンなら CORS のヘッダーを付ける */

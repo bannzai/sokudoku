@@ -1,4 +1,4 @@
-/** robots.txt の 1 行の規則 (Allow / Disallow) */
+/** robots.txt の 1 行の規則 (Allow / Disallow)。pattern は normalizeRobotsPath で表記を揃えたもの */
 type RobotsRule = { allow: boolean; pattern: string };
 
 /**
@@ -26,7 +26,7 @@ export function isAllowedByRobots(robotsText: string, userAgentToken: string, pa
       collectingUserAgents = false;
       // 値が空の Disallow は「すべて許可」を表すため規則にしない
       if (value !== "") {
-        groups[groups.length - 1].rules.push({ allow: key === "allow", pattern: value });
+        groups[groups.length - 1].rules.push({ allow: key === "allow", pattern: normalizeRobotsPath(value) });
       }
     }
   }
@@ -34,10 +34,11 @@ export function isAllowedByRobots(robotsText: string, userAgentToken: string, pa
   const rules = (matchingGroups.length > 0 ? matchingGroups : groups.filter((group) => group.userAgents.includes("*"))).flatMap(
     (group) => group.rules,
   );
+  const normalizedPath = normalizeRobotsPath(path);
   let decidingRule: RobotsRule | undefined;
   for (const rule of rules) {
     if (
-      robotsPatternMatches(rule.pattern, path) &&
+      robotsPatternMatches(rule.pattern, normalizedPath) &&
       (!decidingRule ||
         rule.pattern.length > decidingRule.pattern.length ||
         (rule.pattern.length === decidingRule.pattern.length && rule.allow))
@@ -48,7 +49,7 @@ export function isAllowedByRobots(robotsText: string, userAgentToken: string, pa
   return decidingRule?.allow ?? true;
 }
 
-/** robots.txt のパターン (* は任意の文字列、末尾の $ は終端) が path の先頭から一致するかを返す */
+/** robots.txt のパターン (* は任意の文字列、末尾の $ は終端) が path の先頭から一致するかを返す。どちらも normalizeRobotsPath で揃えた表記を受け取る */
 function robotsPatternMatches(pattern: string, path: string): boolean {
   const anchored = pattern.endsWith("$");
   const source = (anchored ? pattern.slice(0, -1) : pattern)
@@ -56,4 +57,17 @@ function robotsPatternMatches(pattern: string, path: string): boolean {
     .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
     .join(".*");
   return new RegExp(`^${source}${anchored ? "$" : ""}`).test(path);
+}
+
+/**
+ * パスの表記を RFC 9309 (2.2.2) の比較の形に揃える: ASCII 以外の文字は UTF-8 のパーセントエンコードにし、
+ * パーセントエンコードされた非予約文字 (英数字と -._~) は元の文字に戻し、残りのエンコードの 16 進は大文字にする
+ */
+function normalizeRobotsPath(value: string): string {
+  return value
+    .replace(/[^\x00-\x7f]+/g, (characters) => encodeURIComponent(characters))
+    .replace(/%([0-9a-f]{2})/gi, (escape, hex: string) => {
+      const character = String.fromCharCode(parseInt(hex, 16));
+      return /^[A-Za-z0-9\-._~]$/.test(character) ? character : `%${hex.toUpperCase()}`;
+    });
 }
