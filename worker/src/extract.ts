@@ -45,6 +45,10 @@ const blockTagNames = new Set([
 // 読む文字を持たない要素。Readability が除いた後に残っていても本文に入れない
 const skippedTagNames = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG", "MATH", "RT", "RP"]);
 
+/** 日本語の文字 (漢字・ひらがな・カタカナ・全角の記号) に挟まれた、改行を含む空白の並び。前の文字を $1 に取る */
+const cjkLineBreakPattern =
+  /([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}　-〿＀-￯])[^\S\n]*\n\s*(?=[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}　-〿＀-￯])/gu;
+
 /**
  * ページの HTML から Readability で本文を取り出し、段落ごとの文字列にする。
  * 本文を取り出せない (Readability が記事と判定しない・文字が空) 時は undefined を返す
@@ -75,7 +79,11 @@ function htmlToParagraphs(contentHtml: string): string[] {
   let currentParagraph = "";
 
   function flushParagraph() {
-    const paragraph = currentParagraph.replace(/\s+/g, " ").trim();
+    const paragraph = currentParagraph
+      // ソースの HTML で日本語の文を行の途中で折り返した改行は、ブラウザの表示と同じく空白にしない
+      .replace(cjkLineBreakPattern, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
     if (paragraph !== "") {
       paragraphs.push(paragraph);
     }

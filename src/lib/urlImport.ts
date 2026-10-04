@@ -33,6 +33,12 @@ export async function importFromUrl(
   if (pageUrl.protocol !== "http:" && pageUrl.protocol !== "https:") {
     return { ok: false, reason: "invalid-url" };
   }
+  // 認証情報付きの URL は Worker も取得しない (blocked-url) ため、パスワードを Worker へ送る前にここで止める
+  if (pageUrl.username !== "" || pageUrl.password !== "") {
+    return { ok: false, reason: "blocked-url" };
+  }
+  // ページ内の位置 (#...) は取得に使わないため、Worker へ送る URL から除く
+  pageUrl.hash = "";
   // 通信が止まっても「取得中」のまま戻れなくならないよう、レスポンスの本文を読み終えるまでに時間の上限を置く
   const signal = AbortSignal.timeout(extractTimeoutMilliseconds);
   let response: Response;

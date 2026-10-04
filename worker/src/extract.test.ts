@@ -30,6 +30,15 @@ describe("extractArticle", () => {
     expect(extractArticle("<!doctype html><html><head><title>空</title></head><body></body></html>")).toBeUndefined();
   });
 
+  it("日本語の文の途中の改行は空白にせず、英字の間の改行は空白 1 つにする", () => {
+    const html = articleHtml
+      .replace("文章を通常よりも", "文章を\n    通常よりも")
+      .replace("</article>", "<p>speed\nreading は速く\n読む技術である。英語の speed reading と同じ意味で使われることが多い。</p></article>");
+    const paragraphs = extractArticle(html)?.text.split("\n\n") ?? [];
+    expect(paragraphs).toContain(articleParagraphs[0]);
+    expect(paragraphs.at(-1)).toBe("speed reading は速く読む技術である。英語の speed reading と同じ意味で使われることが多い。");
+  });
+
   it("pre の中の改行は行ごとの段落にする", () => {
     const html = articleHtml.replace("</article>", "<pre>const a = 1;\n\nconst b = 2;</pre></article>");
     expect(extractArticle(html)?.text.split("\n\n").slice(-2)).toEqual(["const a = 1;", "const b = 2;"]);

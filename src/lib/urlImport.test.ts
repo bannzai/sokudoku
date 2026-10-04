@@ -41,6 +41,22 @@ describe("importFromUrl", () => {
     },
   );
 
+  it("認証情報付きの URL は Worker を呼ばずに blocked-url にする", async () => {
+    const fetchExtract = fakeExtractFetch(200, {});
+    expect(await importFromUrl("https://alice:secret@example.com/a", extractEndpoint, fetchExtract)).toEqual({
+      ok: false,
+      reason: "blocked-url",
+    });
+    expect(fetchExtract).not.toHaveBeenCalled();
+  });
+
+  it("ページ内の位置 (#...) を除いた URL を Worker に送る", async () => {
+    const fetchExtract = fakeExtractFetch(200, { title: "", text: "本文" });
+    await importFromUrl("https://example.com/a?b=1#note", extractEndpoint, fetchExtract);
+    const [requestUrl] = fetchExtract.mock.calls[0] as unknown as [URL];
+    expect(requestUrl.searchParams.get("url")).toBe("https://example.com/a?b=1");
+  });
+
   it.each([
     [422, "unextractable"],
     [429, "rate-limited"],
