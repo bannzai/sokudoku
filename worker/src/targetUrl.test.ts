@@ -41,12 +41,30 @@ describe("checkTargetUrl", () => {
     "http://[fe80::1]/",
     "http://[::ffff:127.0.0.1]/",
     "http://[::ffff:192.168.0.1]/",
+    "http://[::127.0.0.1]/",
+    "http://[64:ff9b::10.0.0.1]/",
+    "http://[2002:c0a8:0101::1]/",
+    "http://[fec0::1]/",
+    "http://[ff02::1]/",
     "https://user:pass@example.com/",
+    "http://203.0.113.5:6379/",
+    "https://example.com:22/",
   ])("内部向けの名前・非公開のアドレス・認証情報付きの URL %s を blocked-url にする", (input) => {
     expect(checkTargetUrl(input)).toEqual({ ok: false, error: "blocked-url" });
   });
 
   it.each(["http://172.32.0.1/", "http://11.0.0.1/", "http://192.169.0.1/"])("非公開の範囲の外の IPv4 %s は受け付ける", (input) => {
     expect(checkTargetUrl(input)).toMatchObject({ ok: true });
+  });
+
+  it.each(["http://[64:ff9b::808:808]/", "http://[2002:808:808::1]/", "http://example.com:80/", "https://example.com:443/"])(
+    "公開の IPv4 を埋め込んだ IPv6・80/443 のポートを明示した URL %s は受け付ける",
+    (input) => {
+      expect(checkTargetUrl(input)).toMatchObject({ ok: true });
+    },
+  );
+
+  it("2048 文字を超える URL を invalid-url にする", () => {
+    expect(checkTargetUrl(`https://example.com/${"a".repeat(2048)}`)).toEqual({ ok: false, error: "invalid-url" });
   });
 });

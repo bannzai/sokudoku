@@ -53,10 +53,22 @@ describe("importFromUrl", () => {
     });
   });
 
-  it("{ error } の無い 429 は rate-limited、それ以外の失敗は page-unavailable にする", async () => {
+  it("{ error } の無い 429 は rate-limited、それ以外の失敗と画面に出さない理由は network にする", async () => {
     const htmlError = (status: number) => vi.fn(async () => new Response("<html>error</html>", { status }));
     expect(await importFromUrl("https://example.com/a", extractEndpoint, htmlError(429))).toEqual({ ok: false, reason: "rate-limited" });
-    expect(await importFromUrl("https://example.com/a", extractEndpoint, htmlError(500))).toEqual({ ok: false, reason: "page-unavailable" });
+    expect(await importFromUrl("https://example.com/a", extractEndpoint, htmlError(500))).toEqual({ ok: false, reason: "network" });
+    expect(
+      await importFromUrl("https://example.com/a", extractEndpoint, fakeExtractFetch(403, { error: "forbidden-origin" })),
+    ).toEqual({ ok: false, reason: "network" });
+  });
+
+  it("タイトルが本文の先頭の段落 (見出し) から始まるなら、タイトルを重ねない", async () => {
+    const result = await importFromUrl(
+      "https://example.com/a",
+      extractEndpoint,
+      fakeExtractFetch(200, { title: "速読の方法 - サンプルの百科事典", text: "速読の方法\n\n一段落目。" }),
+    );
+    expect(result).toEqual({ ok: true, text: "速読の方法\n\n一段落目。" });
   });
 
   it("Worker に接続できなければ network にする", async () => {

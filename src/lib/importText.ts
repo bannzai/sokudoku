@@ -38,7 +38,7 @@ export const importFailureMessages: Record<ImportFailureReason, string> = {
   "page-unavailable": "ページを取得できませんでした (ログインが必要なページや有料のページは読めません)",
   unextractable: "このページから本文を取り出せませんでした",
   "rate-limited": "読み込みが続いたため 1 分ほど待ってから試してください",
-  network: "取得用のサーバーに接続できませんでした",
+  network: "取得用のサーバーから応答を受け取れませんでした",
 };
 
 // 青空文庫のテキストは Shift_JIS が多く、それ以外のテキストは UTF-8 が大半のため、この 2 つを順に試す

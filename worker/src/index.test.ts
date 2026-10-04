@@ -240,13 +240,9 @@ describe("handleRequest", () => {
     expect(fetchPage).not.toHaveBeenCalled();
   });
 
-  it("make dev の dev サーバ (http://localhost:3000) からの呼び出しを許可する", async () => {
-    const response = await handleRequest(
-      extractRequest("file:///", { origin: "http://localhost:3000" }),
-      fakeEnv(),
-      fakeFetch({}),
-    );
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+  it.each(["http://localhost:3000", "http://127.0.0.1:3000"])("dev サーバ (%s) からの呼び出しを許可する", async (origin) => {
+    const response = await handleRequest(extractRequest("file:///", { origin }), fakeEnv(), fakeFetch({}));
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
   });
 
   it("/extract 以外のパスは 404、GET 以外は 405 にする", async () => {

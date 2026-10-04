@@ -47,9 +47,11 @@ export async function importFromUrl(
     return { ok: false, reason: "unextractable" };
   }
   const title = body.title.trim();
-  // Readability は記事の見出しを本文に残すことがあるため、本文の先頭の段落がタイトルと同じなら重ねない
+  // Readability は記事の見出しを本文に残すことがあり、タイトル (<title>) は見出しにサイト名を足した形 (「見出し - サイト名」) が多い。
+  // 本文の先頭の段落がタイトルの先頭と同じなら、見出しを 2 回読ませないようタイトルを重ねない
   const firstParagraph = body.text.trimStart().split("\n", 1)[0].trim();
-  return importPlainText(title === "" || firstParagraph === title ? body.text : `${title}\n\n${body.text}`);
+  const titleRepeatsFirstParagraph = firstParagraph !== "" && title.startsWith(firstParagraph);
+  return importPlainText(title === "" || titleRepeatsFirstParagraph ? body.text : `${title}\n\n${body.text}`);
 }
 
 /** Worker の失敗のレスポンスの status と { error } から、利用者に見せる理由を決める */
@@ -58,8 +60,9 @@ function extractFailureReason(status: number, body: unknown): ImportFailureReaso
   if (typeof error === "string" && extractErrors.has(error as ImportFailureReason)) {
     return error as ImportFailureReason;
   }
-  // Cloudflare が Worker の手前で返した 429 など、{ error } の無い失敗も status から読める範囲で区別する
-  return status === 429 ? "rate-limited" : "page-unavailable";
+  // Cloudflare が Worker の手前で返した 429 など、{ error } の無い失敗も status から読める範囲で区別する。
+  // それ以外 (Worker の設定の誤りで返る forbidden-origin・not-found 等を含む) は、ページではなく取得用のサーバー側の失敗として出す
+  return status === 429 ? "rate-limited" : "network";
 }
 
 /** Worker の成功のレスポンス ({ title, text, siteName?, lang? }) の形をしているかを返す */

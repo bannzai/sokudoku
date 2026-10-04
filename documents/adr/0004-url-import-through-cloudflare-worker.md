@@ -15,7 +15,8 @@ Accepted
 - 相手サイトの `robots.txt` (RFC 9309) を取得の前に確かめ、`sokudoku-extract` か `*` のグループの `Disallow` に当たるページは取得しない。`robots.txt` が 5xx・接続の失敗なら取得しない。User-Agent は `sokudoku-extract/1.0 (+https://bannzai.github.io/sokudoku/)` と名乗る
 - ログインが必要なページ・有料のページは取得しない (Worker は Cookie・認証情報を送らないため、取得できるのは誰でも見られるページだけ)
 - 取得先は http / https の公開のアドレスに限り、localhost・`.local` 等の内部向けの名前とプライベート・ループバック・リンクローカルの IP アドレスを、リダイレクトの転送先も含めて拒否する (SSRF 対策)
-- CORS は `https://bannzai.github.io` と `http://localhost:3000` (make dev) だけに許可する
+- CORS は `https://bannzai.github.io` と、dev サーバの `http://localhost:3000` (make dev)・`http://127.0.0.1:3000` (webtunnel) だけに許可する。CORS はブラウザ向けの制御で、Origin を付けない呼び出し (curl 等) は防げないため、取得の踏み台としての悪用は回数の制限・User-Agent で名乗ること・取得先の検査で抑える
+- 取得先のポートは 80・443 だけにし、URL は 2048 文字までにする
 - Worker の URL はフロントのビルド時の環境変数 `NEXT_PUBLIC_EXTRACT_URL` (repository variable) で渡し、未設定のビルドでは URL の入口を出さない
 
 ## Consequences

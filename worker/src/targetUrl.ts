@@ -3,10 +3,13 @@ export type TargetUrlCheck = { ok: true; url: URL } | { ok: false; error: "inval
 
 /**
  * 取得先として受け付ける URL を検査する (SSRF 対策)。http / https 以外、認証情報付き、
- * localhost・.local 等の内部向けの名前、プライベート・ループバック・リンクローカル等の IP アドレスを拒否する。
+ * localhost・.local 等の内部向けの名前、プライベート・ループバック・リンクローカル等の IP アドレス、allowedPorts に無いポートを拒否する。
  * 名前解決の結果までは確かめないが、Worker は Cloudflare のエッジから取得するため利用者・提供者の内部ネットワークには届かない
  */
 export function checkTargetUrl(input: string): TargetUrlCheck {
+  if (input.length > maxTargetUrlLength) {
+    return { ok: false, error: "invalid-url" };
+  }
   let url: URL;
   try {
     url = new URL(input);
@@ -16,11 +19,25 @@ export function checkTargetUrl(input: string): TargetUrlCheck {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return { ok: false, error: "invalid-url" };
   }
-  if (url.username !== "" || url.password !== "" || isBlockedHostname(url.hostname)) {
+  if (
+    url.username !== "" ||
+    url.password !== "" ||
+    !allowedPorts.has(url.port) ||
+    isBlockedHostname(url.hostname)
+  ) {
     return { ok: false, error: "blocked-url" };
   }
   return { ok: true, url };
 }
+
+/**
+ * 受け付ける URL の長さの上限。記事の URL はこれに収まり、長いパスで robots.txt の照合の CPU 時間を伸ばされないようにする
+ * (2048 文字は、多くのブラウザ・CDN が扱える URL の長さとして広く使われる目安)
+ */
+const maxTargetUrlLength = 2048;
+
+/** 受け付けるポート。"" は scheme の既定のポート。公開の記事は 80・443 で配信され、それ以外のポートへの取得を踏み台にさせない */
+const allowedPorts = new Set(["", "80", "443"]);
 
 /**
  * 公開のインターネットに無い名前の接尾辞。RFC 6761 (localhost・test・invalid)、RFC 6762 (local)、RFC 8375 (home.arpa)、
@@ -75,18 +92,44 @@ function isBlockedIpv4([a, b]: number[]): boolean {
   );
 }
 
-/** 公開のインターネットで到達できない IPv6 (未指定・ループバック・ユニークローカル・リンクローカル・IPv4 射影の非公開アドレス) なら true を返す */
+/**
+ * 公開のインターネットで到達できない IPv6 なら true を返す: 未指定・ループバック・ユニークローカル・リンクローカル・
+ * 廃止されたサイトローカル (fec0::/10)・マルチキャスト、および IPv4 を埋め込んだ形式 (射影 ::ffff:0:0/96・互換 ::/96・
+ * NAT64 の 64:ff9b::/96・6to4 の 2002::/16) のうち埋め込んだ IPv4 が非公開のもの
+ */
 function isBlockedIpv6(address: string): boolean {
-  if (address === "::" || address === "::1") {
+  const groups = expandIpv6(address);
+  if (!groups) {
     return true;
   }
-  // URL は IPv4 射影アドレスを ::ffff:7f00:1 の形に正規化する
-  const mappedIpv4 = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(address);
-  if (mappedIpv4) {
-    const high = parseInt(mappedIpv4[1], 16);
-    const low = parseInt(mappedIpv4[2], 16);
-    return isBlockedIpv4([high >> 8, high & 0xff, low >> 8, low & 0xff]);
+  const embeddedIpv4 = (high: number, low: number) => [high >> 8, high & 0xff, low >> 8, low & 0xff];
+  const [first, second, , , , sixth, seventh, eighth] = groups;
+  const upperFiveZero = groups.slice(0, 5).every((group) => group === 0);
+  if (upperFiveZero && (sixth === 0 || sixth === 0xffff)) {
+    // 未指定 (::)・ループバック (::1) も、埋め込んだ IPv4 が 0.0.0.0・0.0.0.1 として拒否される
+    return isBlockedIpv4(embeddedIpv4(seventh, eighth));
   }
-  const firstGroup = parseInt(address.split(":")[0] || "0", 16);
-  return (firstGroup & 0xfe00) === 0xfc00 || (firstGroup & 0xffc0) === 0xfe80 || (firstGroup & 0xff00) === 0xff00;
+  if (first === 0x64 && second === 0xff9b && groups.slice(2, 6).every((group) => group === 0)) {
+    return isBlockedIpv4(embeddedIpv4(seventh, eighth));
+  }
+  if (first === 0x2002) {
+    return isBlockedIpv4(embeddedIpv4(second, groups[2]));
+  }
+  return (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80 || (first & 0xffc0) === 0xfec0 || (first & 0xff00) === 0xff00;
+}
+
+/** URL が正規化した IPv6 の表記 (16 進、:: で省略可) を 8 つの 16 ビットの数に展開する。展開できなければ undefined を返す */
+function expandIpv6(address: string): number[] | undefined {
+  const [head, tail, ...rest] = address.split("::");
+  if (rest.length > 0) {
+    return undefined;
+  }
+  const headGroups = head === "" ? [] : head.split(":");
+  const tailGroups = tail === undefined || tail === "" ? [] : tail.split(":");
+  const zeroCount = tail === undefined ? 0 : 8 - headGroups.length - tailGroups.length;
+  const groups = [...headGroups, ...Array<string>(Math.max(zeroCount, 0)).fill("0"), ...tailGroups];
+  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) {
+    return undefined;
+  }
+  return groups.map((group) => parseInt(group, 16));
 }

@@ -24,8 +24,8 @@ export type ExtractError =
   | "not-found"
   | "method-not-allowed";
 
-// 本文を呼び出してよいフロントのオリジン。公開サイト (GitHub Pages) と、make dev の dev サーバ
-const allowedOrigins = new Set(["https://bannzai.github.io", "http://localhost:3000"]);
+// 本文を呼び出してよいフロントのオリジン。公開サイト (GitHub Pages) と、make dev の dev サーバ (webtunnel は 127.0.0.1 で開く)
+const allowedOrigins = new Set(["https://bannzai.github.io", "http://localhost:3000", "http://127.0.0.1:3000"]);
 
 // 取得先のサイトの管理者が取得元を確かめられるよう、製品名と説明のページを名乗る
 const userAgent = "sokudoku-extract/1.0 (+https://bannzai.github.io/sokudoku/)";
