@@ -49,6 +49,20 @@ describe("isAllowedByRobots", () => {
     expect(isAllowedByRobots("User-agent: *\nDisallow: /a/b\n", "sokudoku-extract", "/a%2Fb")).toBe(true);
   });
 
+  it("* を多く並べた規則と一致しない長いパスでも短い時間で判定する", () => {
+    const robotsText = `User-agent: *\nDisallow: /${"*a".repeat(30)}*b\n`;
+    const start = performance.now();
+    expect(isAllowedByRobots(robotsText, "sokudoku-extract", `/${"a".repeat(2000)}`)).toBe(true);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("* は空の文字列にも一致し、$ の無い規則は前方一致にする", () => {
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /a*b\n", "sokudoku-extract", "/ab")).toBe(false);
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /a*b\n", "sokudoku-extract", "/axxbyy")).toBe(false);
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /a*b$\n", "sokudoku-extract", "/axxbyy")).toBe(true);
+    expect(isAllowedByRobots("User-agent: *\nDisallow: /a*b$\n", "sokudoku-extract", "/axxbyyb")).toBe(false);
+  });
+
   it("* と末尾の $ を解釈し、コメントを無視する", () => {
     const robotsText = "User-agent: * # すべて\nDisallow: /*.pdf$ # PDF\nDisallow: /search?*q=\n";
     expect(isAllowedByRobots(robotsText, "sokudoku-extract", "/files/a.pdf")).toBe(false);

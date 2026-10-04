@@ -49,14 +49,39 @@ export function isAllowedByRobots(robotsText: string, userAgentToken: string, pa
   return decidingRule?.allow ?? true;
 }
 
-/** robots.txt のパターン (* は任意の文字列、末尾の $ は終端) が path の先頭から一致するかを返す。どちらも normalizeRobotsPath で揃えた表記を受け取る */
+/**
+ * robots.txt のパターン (* は任意の文字列、末尾の $ は終端) が path の先頭から一致するかを返す。どちらも normalizeRobotsPath で揃えた表記を受け取る。
+ * 相手サイトが書いたパターンを正規表現にするとバックトラッキングで CPU 時間を使い切らせられるため、
+ * 直前の * の位置だけを覚えて戻る照合 (計算量はパターンと path の長さの積まで) にする
+ */
 function robotsPatternMatches(pattern: string, path: string): boolean {
-  const anchored = pattern.endsWith("$");
-  const source = (anchored ? pattern.slice(0, -1) : pattern)
-    .split("*")
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-    .join(".*");
-  return new RegExp(`^${source}${anchored ? "$" : ""}`).test(path);
+  // 末尾に $ が無いパターンは前方一致のため、末尾に * があるのと同じに扱う
+  const wildcardPattern = pattern.endsWith("$") ? pattern.slice(0, -1) : `${pattern}*`;
+  let patternIndex = 0;
+  let pathIndex = 0;
+  let lastStarPatternIndex = -1;
+  let lastStarPathIndex = 0;
+  while (pathIndex < path.length) {
+    if (patternIndex < wildcardPattern.length && wildcardPattern[patternIndex] === "*") {
+      lastStarPatternIndex = patternIndex;
+      lastStarPathIndex = pathIndex;
+      patternIndex += 1;
+    } else if (patternIndex < wildcardPattern.length && wildcardPattern[patternIndex] === path[pathIndex]) {
+      patternIndex += 1;
+      pathIndex += 1;
+    } else if (lastStarPatternIndex !== -1) {
+      // 直前の * が 1 文字多く飲み込んだとして照合し直す
+      patternIndex = lastStarPatternIndex + 1;
+      lastStarPathIndex += 1;
+      pathIndex = lastStarPathIndex;
+    } else {
+      return false;
+    }
+  }
+  while (patternIndex < wildcardPattern.length && wildcardPattern[patternIndex] === "*") {
+    patternIndex += 1;
+  }
+  return patternIndex === wildcardPattern.length;
 }
 
 /**
