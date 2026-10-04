@@ -7,6 +7,7 @@ main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ
 ## 不変条件
 
 - 読み込んだ本文をサーバー・外部サービスへ送らない、保存しない。処理はすべてブラウザ内で行う (ADR 0001)
+  - 例外: URL からの取り込みだけは、ページの URL を `worker/` の Cloudflare Worker へ送り、Worker が公開ページの取得と本文の抽出を行う。Worker は URL・本文を保存・記録しない (ADR 0004)
 - 文節 (単語) は中央揃えで表示する。ORP を定位置に揃える配置・特定の 1 文字の色付け・文節の中の文字を位置で変える見た目を作らない (ADR 0002)
 - 再生中に全文を出さない。全文と現在位置のハイライトは停止中だけ出す。本・記事の一覧を表示したまま再生しない (ADR 0002)
 - 固有名詞・人物名で表示時間を延ばさない。間をとるのは句読点だけにする (ADR 0002)
@@ -23,7 +24,9 @@ main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ
 | 公開後の確認 | https://bannzai.github.io/sokudoku/ を webtunnel のセッションで開く |
 | 公開後の利用状況の分析 | `/cloudflare-web-analytics-report` (設定は `.claude/cloudflare-web-analytics.json`) で Cloudflare Web Analytics の日別の訪問数・人気ページを読む |
 
-`make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `check` (lint・typecheck・test・build-web)
+`make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `typecheck-worker`・`test-worker` (`worker/` の Worker) / `check` (lint・typecheck・test・build-web・typecheck-worker・test-worker)
+
+`worker/` の Worker は `wrangler dev` をローカルで起動せず、vitest の単体テストと、main へのマージで `deploy-worker.yml` が行う配信で確かめる。
 
 <!-- ai-review-config begin -->
 <!--
