@@ -1,182 +1,214 @@
+.importPage {
+  display: grid;
+  gap: 24px;
+  padding-block: 8px 48px;
+}
+
 .title {
-  margin: 0 0 24px;
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 24px;
 }
 
 .legalLinks {
   display: flex;
-  gap: 16px;
-  margin-top: 32px;
-  font-size: 0.9rem;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding-top: 20px;
+  font-size: 13px;
+  border-top: 1px solid var(--color-border);
+}
+
+.legalLinks a {
+  color: var(--color-muted);
 }
 
 .heading {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 15px;
 }
 
 .note {
   margin: 0;
+  font-size: 13px;
   color: var(--color-muted);
-  font-size: 0.9rem;
-}
-
-.button {
-  padding: 8px 16px;
-  font: inherit;
-  cursor: pointer;
 }
 
 .session {
   display: grid;
-  gap: 16px;
+  gap: 20px;
+  padding-block: 0 40px;
 }
 
-.progress {
-  display: grid;
-  gap: 4px;
-}
-
-.progressBar {
-  width: 100%;
-}
-
-.progressText {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.9rem;
-  text-align: center;
-}
-
-/* 単位はいつも同じ位置に中央揃えで出す。単位の中の特定の文字の色・位置を変えない (ADR 0002) */
+/* 単位は画面の上寄りの固定の位置に出し、訳の有無・長さで単位の位置が動かないよう訳は下へだけ伸ばす */
 .display {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  padding: 32px 16px;
+  display: grid;
+  align-content: start;
+  min-height: 300px;
+  padding: 72px 16px 24px;
   font: inherit;
   color: inherit;
-  text-align: center;
   cursor: pointer;
   background: transparent;
-  border: 1px solid var(--color-muted);
+  border: 0;
   border-radius: 8px;
-}
-
-/* 表示の上下の中央に置く位置の目印 */
-.display::before,
-.display::after {
-  position: absolute;
-  left: 50%;
-  width: 1px;
-  height: 16px;
-  content: "";
-  background: var(--color-muted);
-}
-
-.display::before {
-  top: 16px;
-}
-
-.display::after {
-  bottom: 16px;
-}
-
-.unitText {
-  font-size: 2.5rem;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
 }
 
 /* 訳は単位の表示の外に出す。訳の有無・長さで下のボタンが上下しないよう、2 行分の高さを常にとる */
 .translation {
-  min-height: 3em;
-  margin: 0;
-  line-height: 1.5;
+  width: 100%;
+  max-width: 34em;
+  min-height: 3.6em;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--color-muted);
   text-align: center;
-}
-
-.translationControls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
-  justify-content: center;
 }
 
 .controls {
+  display: grid;
+  gap: 14px;
+}
+
+/* 再生中は操作を薄くし、単位に目が向くようにする。マウスを載せた時とキーボードで選んだ時は戻す */
+.playing .controls {
+  opacity: 0.72;
+  transition: opacity 200ms;
+}
+
+.playing .controls:hover,
+.playing .controls:focus-within {
+  opacity: 1;
+}
+
+.progressBar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  appearance: none;
+  background: var(--color-border);
+  border: 0;
+  border-radius: 1px;
+}
+
+.progressBar::-webkit-progress-bar {
+  background: var(--color-border);
+}
+
+.progressBar::-webkit-progress-value {
+  background: var(--color-accent);
+}
+
+.progressBar::-moz-progress-bar {
+  background: var(--color-accent);
+}
+
+.controlsRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
+  gap: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.playButton {
-  min-width: 7em;
-  font-weight: bold;
-}
-
-.speeds {
+.controlsGroup {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
-  justify-content: center;
-}
-
-.speed {
-  display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.speedValue {
-  min-width: 6.5em;
-  text-align: center;
+.readout {
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  white-space: nowrap;
 }
 
-.keyHelp {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.85rem;
-  text-align: center;
+.readout strong {
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+.playButton {
+  min-width: 9em;
 }
 
 .fullTextSection {
   display: grid;
-  gap: 8px;
-  justify-items: start;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.fullTextHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: baseline;
+  justify-content: space-between;
 }
 
 /* 位置は offsetTop で現在の単位までスクロールするため、この要素を基準にする */
 .fullText {
   position: relative;
-  box-sizing: border-box;
   width: 100%;
+  max-width: 36em;
   max-height: 50vh;
-  padding: 12px;
+  margin: 0 auto;
+  padding: 12px 4px;
   overflow-y: auto;
+  font-family: var(--font-read);
+  font-size: 18px;
+  line-height: 2.1;
   white-space: pre-wrap;
   cursor: text;
-  border: 1px solid var(--color-muted);
-  border-radius: 4px;
 }
 
 .currentUnit {
   color: inherit;
-  background: color-mix(in srgb, var(--color-text) 20%, transparent);
+  background: var(--color-highlight);
   border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--color-highlight);
 }
 
 .finished {
   display: grid;
-  gap: 24px;
+  gap: 28px;
+  max-width: 720px;
+  padding-block: 40px 64px;
 }
 
-.finished .title {
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   margin: 0;
+  border-block: 1px solid var(--color-border);
+}
+
+.stat {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 20px 16px 20px 0;
+}
+
+.stat dt {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.stat dd {
+  margin: 0;
+  font-family: var(--font-read);
+  font-size: clamp(20px, 3vw, 26px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.records {
+  display: grid;
+  gap: 12px;
 }
 
 .summary {
@@ -184,30 +216,45 @@
   grid-template-columns: max-content 1fr;
   gap: 4px 16px;
   margin: 0;
+  font-size: 14px;
+}
+
+.summary dt {
+  color: var(--color-muted);
 }
 
 .summary dd {
   margin: 0;
 }
 
-.records {
-  display: grid;
-  gap: 8px;
-}
-
 .days {
   justify-self: start;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
   border-collapse: collapse;
+}
+
+.days th {
+  font-weight: 400;
+  color: var(--color-muted);
 }
 
 .days th,
 .days td {
-  padding: 4px 12px 4px 0;
+  padding: 6px 24px 6px 0;
   text-align: left;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .display {
+    min-height: 240px;
+    padding-top: 48px;
+  }
 }

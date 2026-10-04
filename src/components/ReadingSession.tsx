@@ -53,7 +53,10 @@ import {
   type TranslationState,
 } from "@/lib/translationState";
 import { checkTranslatorAvailability, createTranslator, type EnglishToJapaneseTranslator } from "@/lib/translator";
+import { AppBar } from "./AppBar";
+import buttonStyles from "./Button.module.css";
 import styles from "./Reader.module.css";
+import stageStyles from "./UnitStage.module.css";
 
 /** 再生の画面に渡す値。 */
 type ReadingSessionProps = {
@@ -225,88 +228,95 @@ function FinishedScreen({ readerState, finishedReadings, englishReadingDays, onR
   const finishedReadingSummary = summarizeFinishedReadings(finishedReadings, readerState.finishedAt ?? 0);
   const englishReadingDaysSummary = summarizeEnglishReadingDays(englishReadingDays, readerState.finishedAt ?? 0);
   return (
-    <main className={styles.finished}>
-      <h1 className={styles.title}>読了</h1>
-      <dl className={styles.summary}>
-        <dt>読んだ時間</dt>
-        <dd>{formatPlayedTime(summary.playedMs)}</dd>
-        <dt>読んだ量</dt>
-        <dd>{formatReadAmount(summary)}</dd>
-        {summary.japaneseCharactersPerMinute !== undefined && (
-          <>
-            <dt>実効速度 (日本語)</dt>
-            <dd>{formatNumber(summary.japaneseCharactersPerMinute)} 文字/分</dd>
-          </>
-        )}
-        {summary.englishWordsPerMinute !== undefined && (
-          <>
-            <dt>実効速度 (英語)</dt>
-            <dd>{formatNumber(summary.englishWordsPerMinute)} 語/分</dd>
-          </>
-        )}
-      </dl>
-      <section className={styles.records}>
-        <h2 className={styles.heading}>読了の記録</h2>
-        <dl className={styles.summary}>
-          <dt>直近 7 日</dt>
-          <dd>{formatReadAmount(finishedReadingSummary.lastSevenDays)}</dd>
-          <dt>累計</dt>
-          <dd>{formatReadAmount(finishedReadingSummary.allTime)}</dd>
+    <>
+      <AppBar linksToTop={false} />
+      <main className={styles.finished}>
+        <h1 className={styles.title}>読了</h1>
+        <dl className={styles.stats}>
+          <div className={styles.stat}>
+            <dt>読んだ時間</dt>
+            <dd>{formatPlayedTime(summary.playedMs)}</dd>
+          </div>
+          <div className={styles.stat}>
+            <dt>読んだ量</dt>
+            <dd>{formatReadAmount(summary)}</dd>
+          </div>
+          {summary.japaneseCharactersPerMinute !== undefined && (
+            <div className={styles.stat}>
+              <dt>実効速度 (日本語)</dt>
+              <dd>{formatNumber(summary.japaneseCharactersPerMinute)} 文字/分</dd>
+            </div>
+          )}
+          {summary.englishWordsPerMinute !== undefined && (
+            <div className={styles.stat}>
+              <dt>実効速度 (英語)</dt>
+              <dd>{formatNumber(summary.englishWordsPerMinute)} 語/分</dd>
+            </div>
+          )}
         </dl>
-        <table className={styles.days}>
-          <thead>
-            <tr>
-              <th>日付</th>
-              <th>読んだ量</th>
-            </tr>
-          </thead>
-          <tbody>
-            {finishedReadingSummary.days.slice(0, displayedDayCount).map((day) => (
-              <tr key={day.date}>
-                <td>{day.date}</td>
-                <td>{formatReadAmount(day)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      {englishReadingDaysSummary.days.length > 0 && (
         <section className={styles.records}>
-          <h2 className={styles.heading}>英文の訳の表示</h2>
+          <h2 className={styles.heading}>読了の記録</h2>
           <dl className={styles.summary}>
             <dt>直近 7 日</dt>
-            <dd>
-              英文を読んだ日 {englishReadingDaysSummary.lastSevenDaysEnglishReadingDayCount} 日 ・ 訳を出した日{" "}
-              {englishReadingDaysSummary.lastSevenDaysTranslationDisplayDayCount} 日
-            </dd>
+            <dd>{formatReadAmount(finishedReadingSummary.lastSevenDays)}</dd>
+            <dt>累計</dt>
+            <dd>{formatReadAmount(finishedReadingSummary.allTime)}</dd>
           </dl>
           <table className={styles.days}>
             <thead>
               <tr>
-                <th>英文を読んだ日</th>
-                <th>訳を出した回数</th>
+                <th>日付</th>
+                <th>読んだ量</th>
               </tr>
             </thead>
             <tbody>
-              {englishReadingDaysSummary.days.slice(0, displayedDayCount).map((day) => (
+              {finishedReadingSummary.days.slice(0, displayedDayCount).map((day) => (
                 <tr key={day.date}>
                   <td>{day.date}</td>
-                  <td>{formatNumber(day.translationDisplayCount)} 回</td>
+                  <td>{formatReadAmount(day)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
-      )}
-      <div className={styles.actions}>
-        <button type="button" className={styles.button} onClick={onRestart}>
-          最初から読む
-        </button>
-        <button type="button" className={styles.button} onClick={onClose}>
-          別の本文を読む
-        </button>
-      </div>
-    </main>
+        {englishReadingDaysSummary.days.length > 0 && (
+          <section className={styles.records}>
+            <h2 className={styles.heading}>英文の訳の表示</h2>
+            <dl className={styles.summary}>
+              <dt>直近 7 日</dt>
+              <dd>
+                英文を読んだ日 {englishReadingDaysSummary.lastSevenDaysEnglishReadingDayCount} 日 ・ 訳を出した日{" "}
+                {englishReadingDaysSummary.lastSevenDaysTranslationDisplayDayCount} 日
+              </dd>
+            </dl>
+            <table className={styles.days}>
+              <thead>
+                <tr>
+                  <th>英文を読んだ日</th>
+                  <th>訳を出した回数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {englishReadingDaysSummary.days.slice(0, displayedDayCount).map((day) => (
+                  <tr key={day.date}>
+                    <td>{day.date}</td>
+                    <td>{formatNumber(day.translationDisplayCount)} 回</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+        <div className={styles.actions}>
+          <button type="button" className={`${buttonStyles.button} ${buttonStyles.primary}`} onClick={onRestart}>
+            最初から読む
+          </button>
+          <button type="button" className={buttonStyles.button} onClick={onClose}>
+            別の本文を読む
+          </button>
+        </div>
+      </main>
+    </>
   );
 }
 
@@ -540,141 +550,156 @@ export function ReadingSession({
   const currentSentenceTranslation = sentenceTranslations[currentSentenceIndex];
   const notice = translatorNotice(translationState);
   return (
-    <main className={styles.session}>
-      <div className={styles.progress}>
-        <progress className={styles.progressBar} value={1 - remaining} max={1} />
-        <p className={styles.progressText}>
-          残り {Math.round(remaining * 100)}% ・ {formatRemainingTime(remainingDurations[readerState.unitIndex])}
-        </p>
-      </div>
-      <button
-        type="button"
-        className={styles.display}
-        onMouseDown={keepFocusOffButton}
-        onClick={() => setReaderState(togglePlay(readerState, Date.now()))}
-        aria-label={isPlaying ? "一時停止" : "再開"}
-      >
-        <span className={styles.unitText}>{currentUnit.text}</span>
-      </button>
-      {hasEnglishSentence && (
-        // 単位の表示の外 (下) に今の文の訳だけを出す。原文の文と訳を対にして並べない (ADR 0002)
-        <p className={styles.translation} lang="ja" aria-live="polite">
-          {isTranslationShown &&
-            (currentSentenceTranslation === undefined
-              ? "訳しています"
-              : (currentSentenceTranslation ?? "この文は訳せませんでした"))}
-        </p>
-      )}
-      <div className={styles.controls}>
+    <>
+      <AppBar description={isPlaying ? "再生中" : "一時停止中"} linksToTop={false} />
+      <main className={isPlaying ? `${styles.session} ${styles.playing}` : styles.session}>
         <button
           type="button"
-          className={styles.button}
-          onMouseDown={keepFocusOffButton}
-          onClick={() => setReaderState(moveBySentence(readerState, "previous"))}
-        >
-          前の文
-        </button>
-        <button
-          type="button"
-          className={styles.button}
-          onMouseDown={keepFocusOffButton}
-          onClick={() => setReaderState(moveByUnits(readerState, -1))}
-        >
-          前へ
-        </button>
-        <button
-          type="button"
-          className={`${styles.button} ${styles.playButton}`}
+          className={styles.display}
           onMouseDown={keepFocusOffButton}
           onClick={() => setReaderState(togglePlay(readerState, Date.now()))}
+          aria-label={isPlaying ? "一時停止" : "再開"}
         >
-          {isPlaying ? "一時停止" : "再生"}
+          <span className={stageStyles.stage}>
+            <span
+              className={
+                currentUnit.language === "ja" ? `${stageStyles.unitText} ${stageStyles.japanese}` : stageStyles.unitText
+              }
+            >
+              {currentUnit.text}
+            </span>
+          </span>
         </button>
-        <button
-          type="button"
-          className={styles.button}
-          onMouseDown={keepFocusOffButton}
-          onClick={() => setReaderState(moveByUnits(readerState, 1))}
-        >
-          次へ
-        </button>
-        <button
-          type="button"
-          className={styles.button}
-          onMouseDown={keepFocusOffButton}
-          onClick={() => setReaderState(moveBySentence(readerState, "next"))}
-        >
-          次の文
-        </button>
-      </div>
-      {hasEnglishSentence && (
-        <div className={styles.translationControls}>
-          <button
-            type="button"
-            className={styles.button}
-            onMouseDown={keepFocusOffButton}
-            onClick={toggleTranslationDisplay}
-            disabled={!canToggleTranslation(translationState)}
-            aria-pressed={translationState.visible}
-          >
-            {translationState.visible ? "訳を隠す" : "訳を出す"}
-          </button>
-          {notice !== undefined && <span className={styles.note}>{notice}</span>}
-        </div>
-      )}
-      <div className={styles.speeds}>
-        {languages.map((language) => {
-          const speedKey = speedKeys[language];
-          const { languageName, speedUnit } = speedLabels[language];
-          return (
-            <div key={language} className={styles.speed}>
-              <span>{languageName}</span>
+        {hasEnglishSentence && (
+          // 単位の表示の外 (下) に今の文の訳だけを出す。原文の文と訳を対にして並べない (ADR 0002)
+          <p className={styles.translation} lang="ja" aria-live="polite">
+            {isTranslationShown &&
+              (currentSentenceTranslation === undefined
+                ? "訳しています"
+                : (currentSentenceTranslation ?? "この文は訳せませんでした"))}
+          </p>
+        )}
+        <div className={styles.controls}>
+          <progress className={styles.progressBar} value={1 - remaining} max={1} aria-label="読んだ位置" />
+          <div className={styles.controlsRow}>
+            <div className={styles.controlsGroup}>
+              {languages.map((language) => {
+                const speedKey = speedKeys[language];
+                const { languageName, speedUnit } = speedLabels[language];
+                return (
+                  <div key={language} className={styles.controlsGroup}>
+                    <button
+                      type="button"
+                      className={`${buttonStyles.button} ${buttonStyles.quiet}`}
+                      onMouseDown={keepFocusOffButton}
+                      onClick={() => setReaderState(stepSpeed(readerState, [language], -1))}
+                      disabled={readerState.speed[speedKey] <= speedLimits[speedKey].min}
+                      aria-label={`遅く (${languageName}の速度を下げる)`}
+                    >
+                      遅く <kbd>↓</kbd>
+                    </button>
+                    <span className={styles.readout}>
+                      <strong>{formatNumber(readerState.speed[speedKey])}</strong> {speedUnit}
+                    </span>
+                    <button
+                      type="button"
+                      className={`${buttonStyles.button} ${buttonStyles.quiet}`}
+                      onMouseDown={keepFocusOffButton}
+                      onClick={() => setReaderState(stepSpeed(readerState, [language], 1))}
+                      disabled={readerState.speed[speedKey] >= speedLimits[speedKey].max}
+                      aria-label={`速く (${languageName}の速度を上げる)`}
+                    >
+                      速く <kbd>↑</kbd>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              className={`${buttonStyles.button} ${buttonStyles.primary} ${styles.playButton}`}
+              onMouseDown={keepFocusOffButton}
+              onClick={() => setReaderState(togglePlay(readerState, Date.now()))}
+            >
+              {isPlaying ? "一時停止" : "再生"} <kbd>space</kbd>
+            </button>
+            <span className={styles.readout}>
+              残り {Math.round(remaining * 100)}% ・ {formatRemainingTime(remainingDurations[readerState.unitIndex])}
+            </span>
+          </div>
+          <div className={styles.controlsRow}>
+            <div className={styles.controlsGroup}>
               <button
                 type="button"
-                className={styles.button}
+                className={buttonStyles.button}
                 onMouseDown={keepFocusOffButton}
-                onClick={() => setReaderState(stepSpeed(readerState, [language], -1))}
-                disabled={readerState.speed[speedKey] <= speedLimits[speedKey].min}
-                aria-label={`${languageName}の速度を下げる`}
+                onClick={() => setReaderState(moveBySentence(readerState, "previous"))}
               >
-                −
+                前の文 <kbd>shift ←</kbd>
               </button>
-              <span className={styles.speedValue}>
-                {formatNumber(readerState.speed[speedKey])} {speedUnit}
-              </span>
               <button
                 type="button"
-                className={styles.button}
+                className={buttonStyles.button}
                 onMouseDown={keepFocusOffButton}
-                onClick={() => setReaderState(stepSpeed(readerState, [language], 1))}
-                disabled={readerState.speed[speedKey] >= speedLimits[speedKey].max}
-                aria-label={`${languageName}の速度を上げる`}
+                onClick={() => setReaderState(moveByUnits(readerState, -1))}
               >
-                +
+                前へ <kbd>←</kbd>
+              </button>
+              <button
+                type="button"
+                className={buttonStyles.button}
+                onMouseDown={keepFocusOffButton}
+                onClick={() => setReaderState(moveByUnits(readerState, 1))}
+              >
+                次へ <kbd>→</kbd>
+              </button>
+              <button
+                type="button"
+                className={buttonStyles.button}
+                onMouseDown={keepFocusOffButton}
+                onClick={() => setReaderState(moveBySentence(readerState, "next"))}
+              >
+                次の文 <kbd>shift →</kbd>
               </button>
             </div>
-          );
-        })}
-      </div>
-      <p className={styles.keyHelp}>
-        space 再生と一時停止 ・ ← → 1 単位 ・ shift + ← → 1 文 ・ ↑ ↓ 速度{hasEnglishSentence && " ・ T 訳の出し入れ"}
-      </p>
-      {!isPlaying && (
-        <section className={styles.fullTextSection}>
-          <h2 className={styles.heading}>全文</h2>
-          <p className={styles.note}>クリックした位置から再開します</p>
-          <FullText
-            source={source}
-            currentUnit={currentUnit}
-            onSelectOffset={(offset) =>
-              setReaderState(playFrom(readerState, unitIndexAtOffset(units, offset), Date.now()))
-            }
-          />
-          <button type="button" className={styles.button} onClick={onClose}>
-            別の本文を読む
-          </button>
-        </section>
-      )}
-    </main>
+            {hasEnglishSentence && (
+              <div className={styles.controlsGroup}>
+                <button
+                  type="button"
+                  className={buttonStyles.button}
+                  onMouseDown={keepFocusOffButton}
+                  onClick={toggleTranslationDisplay}
+                  disabled={!canToggleTranslation(translationState)}
+                  aria-pressed={translationState.visible}
+                >
+                  {translationState.visible ? "訳を隠す" : "訳を出す"} <kbd>T</kbd>
+                </button>
+                {notice !== undefined && <span className={styles.note}>{notice}</span>}
+              </div>
+            )}
+          </div>
+        </div>
+        {!isPlaying && (
+          <section className={styles.fullTextSection}>
+            <div className={styles.fullTextHeader}>
+              <h2 className={styles.heading}>全文</h2>
+              <p className={styles.note}>クリックした位置から再開します</p>
+            </div>
+            <FullText
+              source={source}
+              currentUnit={currentUnit}
+              onSelectOffset={(offset) =>
+                setReaderState(playFrom(readerState, unitIndexAtOffset(units, offset), Date.now()))
+              }
+            />
+            <div>
+              <button type="button" className={buttonStyles.button} onClick={onClose}>
+                別の本文を読む
+              </button>
+            </div>
+          </section>
+        )}
+      </main>
+    </>
   );
 }

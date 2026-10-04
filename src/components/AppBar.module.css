@@ -1,0 +1,30 @@
+/* 左右の余白と最大幅を main (globals.css) とそろえ、サービス名の左端を本文の左端に合わせる */
+.appBar {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}
+
+.inner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.name {
+  font-family: var(--font-read);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.description {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
