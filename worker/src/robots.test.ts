@@ -56,6 +56,13 @@ describe("isAllowedByRobots", () => {
     expect(performance.now() - start).toBeLessThan(500);
   });
 
+  it("空白を長く並べた行があっても短い時間で読む", () => {
+    const robotsText = `User-agent: x${" ".repeat(500_000)}y\nUser-agent: *\nDisallow: /a\n`;
+    const start = performance.now();
+    expect(isAllowedByRobots(robotsText, "sokudoku-extract", "/a")).toBe(false);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
   it("* は空の文字列にも一致し、$ の無い規則は前方一致にする", () => {
     expect(isAllowedByRobots("User-agent: *\nDisallow: /a*b\n", "sokudoku-extract", "/ab")).toBe(false);
     expect(isAllowedByRobots("User-agent: *\nDisallow: /a*b\n", "sokudoku-extract", "/axxbyy")).toBe(false);

@@ -103,7 +103,13 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
   try {
     const signal = AbortSignal.timeout(timeoutMilliseconds);
     const page = await fetchPageAllowedByRobots(targetUrlCheck.url, fetchPage, signal);
-    const article = extractArticle(page);
+    let article: ReturnType<typeof extractArticle>;
+    try {
+      article = extractArticle(page);
+    } catch {
+      // 極端に深い入れ子の HTML などで解析が例外になったページも、取得はできたが本文を取り出せなかったものとして扱う
+      article = undefined;
+    }
     if (!article) {
       return errorResponse("unextractable", origin);
     }

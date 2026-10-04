@@ -10,12 +10,14 @@ export function isAllowedByRobots(robotsText: string, userAgentToken: string, pa
   const groups: { userAgents: string[]; rules: RobotsRule[] }[] = [];
   let collectingUserAgents = false;
   for (const line of robotsText.split(/\r\n|\r|\n/)) {
-    const match = /^\s*([A-Za-z-]+)\s*:\s*(.*?)\s*$/.exec(line.replace(/#.*$/, ""));
-    if (!match) {
+    // 相手サイトが書いた行を正規表現の後方の照合にかけると、長い空白の並びで二次時間になるため、区切りの位置で分けて trim する
+    const uncommentedLine = line.split("#", 1)[0];
+    const separatorIndex = uncommentedLine.indexOf(":");
+    if (separatorIndex === -1) {
       continue;
     }
-    const key = match[1].toLowerCase();
-    const value = match[2];
+    const key = uncommentedLine.slice(0, separatorIndex).trim().toLowerCase();
+    const value = uncommentedLine.slice(separatorIndex + 1).trim();
     if (key === "user-agent") {
       if (!collectingUserAgents) {
         groups.push({ userAgents: [], rules: [] });
