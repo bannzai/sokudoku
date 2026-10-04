@@ -1,0 +1,279 @@
+import { extractArticle } from "./extract";
+import { isAllowedByRobots } from "./robots";
+import { checkTargetUrl } from "./targetUrl";
+
+/** Workers の Rate Limiting binding のうち、この Worker が使う API */
+type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
+
+/** wrangler.toml で Worker に結び付ける binding */
+export type Env = { EXTRACT_RATE_LIMITER: RateLimit };
+
+/**
+ * 失敗の理由。フロント (src/lib/importText.ts の ImportFailureReason) がこの値で利用者に見せる文言を選ぶ。
+ * forbidden-origin・not-found・method-not-allowed はフロントからの正しい呼び出しでは起きない
+ */
+export type ExtractError =
+  | "invalid-url"
+  | "blocked-url"
+  | "robots-disallowed"
+  | "page-too-large"
+  | "page-unavailable"
+  | "unextractable"
+  | "rate-limited"
+  | "forbidden-origin"
+  | "not-found"
+  | "method-not-allowed";
+
+// 本文を呼び出してよいフロントのオリジン。公開サイト (GitHub Pages) と、make dev の dev サーバ
+const allowedOrigins = new Set(["https://bannzai.github.io", "http://localhost:3000"]);
+
+// 取得先のサイトの管理者が取得元を確かめられるよう、製品名と説明のページを名乗る
+const userAgent = "sokudoku-extract/1.0 (+https://bannzai.github.io/sokudoku/)";
+// robots.txt の User-agent 行と照らし合わせる製品名 (RFC 9309 は大文字小文字を区別しない)
+const robotsUserAgentToken = "sokudoku-extract";
+
+// リダイレクトは 5 回まで追う。RFC 9309 が robots.txt に求める回数と同じで、通常のサイトの http → https → 正規の URL の転送に足りる
+const maxRedirects = 5;
+// ページの HTML の上限。文章のページの HTML は数百 KB に収まり、5 MB を超えるのは本文以外 (埋め込みの画像・スクリプト) が大半を占めるページのため
+const maxPageBytes = 5 * 1024 * 1024;
+// robots.txt の上限。RFC 9309 がクローラーに読むことを求める最小の大きさ (500 KiB)
+const maxRobotsBytes = 500 * 1024;
+// 1 回の取り込み (robots.txt とページの取得) の時間の上限。フロントの利用者が待てる時間として 10 秒にする
+const timeoutMilliseconds = 10_000;
+
+/** 失敗の理由ごとの HTTP status */
+const errorStatuses: Record<ExtractError, number> = {
+  "invalid-url": 400,
+  "blocked-url": 400,
+  "robots-disallowed": 403,
+  "page-too-large": 413,
+  "page-unavailable": 502,
+  unextractable: 422,
+  "rate-limited": 429,
+  "forbidden-origin": 403,
+  "not-found": 404,
+  "method-not-allowed": 405,
+};
+
+/** 取得の途中で失敗した理由を運ぶ例外 */
+class ExtractFailure extends Error {
+  /** @param extractError 利用者に返す失敗の理由 */
+  constructor(readonly extractError: ExtractError) {
+    super(extractError);
+  }
+}
+
+export default {
+  fetch(request: Request, env: Env): Promise<Response> {
+    return handleRequest(request, env, fetch);
+  },
+};
+
+/**
+ * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
+ * 取得した URL・本文はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)
+ */
+export async function handleRequest(request: Request, env: Env, fetchPage: typeof fetch): Promise<Response> {
+  const origin = request.headers.get("Origin");
+  if (origin !== null && !allowedOrigins.has(origin)) {
+    return errorResponse("forbidden-origin", null);
+  }
+  const requestUrl = new URL(request.url);
+  if (requestUrl.pathname !== "/extract") {
+    return errorResponse("not-found", origin);
+  }
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: responseHeaders(origin) });
+  }
+  if (request.method !== "GET") {
+    return errorResponse("method-not-allowed", origin);
+  }
+  // 回数を数えるためだけに IP を使い、記録はしない
+  const { success } = await env.EXTRACT_RATE_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") ?? "unknown" });
+  if (!success) {
+    return errorResponse("rate-limited", origin);
+  }
+  const targetUrlCheck = checkTargetUrl(requestUrl.searchParams.get("url") ?? "");
+  if (!targetUrlCheck.ok) {
+    return errorResponse(targetUrlCheck.error, origin);
+  }
+  try {
+    const signal = AbortSignal.timeout(timeoutMilliseconds);
+    const page = await fetchPageAllowedByRobots(targetUrlCheck.url, fetchPage, signal);
+    const article = extractArticle(page);
+    if (!article) {
+      return errorResponse("unextractable", origin);
+    }
+    return new Response(JSON.stringify(article), { status: 200, headers: responseHeaders(origin) });
+  } catch (error) {
+    // タイムアウト・接続の失敗は、利用者から見るとページを取得できなかったことと同じため page-unavailable にまとめる
+    return errorResponse(error instanceof ExtractFailure ? error.extractError : "page-unavailable", origin);
+  }
+}
+
+/**
+ * リダイレクトを 1 回ずつ検査しながら url のページを取得し、HTML の文字列を返す。
+ * 転送先も含め、取得するすべての URL について取得先の検査と robots.txt の確認を行う。失敗は ExtractFailure を投げる
+ */
+async function fetchPageAllowedByRobots(url: URL, fetchPage: typeof fetch, signal: AbortSignal): Promise<string> {
+  const robotsAllowedOrigins = new Set<string>();
+  const response = await fetchFollowingRedirects(url, fetchPage, signal, async (hopUrl) => {
+    if (!robotsAllowedOrigins.has(hopUrl.origin)) {
+      await assertAllowedByRobots(hopUrl, fetchPage, signal);
+      robotsAllowedOrigins.add(hopUrl.origin);
+    }
+  });
+  if (!response.ok) {
+    throw new ExtractFailure("page-unavailable");
+  }
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!/^\s*(text\/html|application\/xhtml\+xml)\b/i.test(contentType)) {
+    throw new ExtractFailure("unextractable");
+  }
+  const bytes = await readBodyWithLimit(response, maxPageBytes);
+  if (!bytes) {
+    throw new ExtractFailure("page-too-large");
+  }
+  return decodeHtml(bytes, contentType);
+}
+
+/**
+ * hopUrl のオリジンの robots.txt が、この Worker に hopUrl の取得を許すかを確かめ、許さなければ ExtractFailure を投げる。
+ * RFC 9309 に従い、robots.txt が 4xx なら制限なし、5xx・接続の失敗なら取得しない
+ */
+async function assertAllowedByRobots(hopUrl: URL, fetchPage: typeof fetch, signal: AbortSignal): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetchFollowingRedirects(new URL("/robots.txt", hopUrl), fetchPage, signal, async () => {});
+  } catch (error) {
+    if (error instanceof ExtractFailure) {
+      throw error;
+    }
+    throw new ExtractFailure("page-unavailable");
+  }
+  if (response.status >= 400 && response.status < 500) {
+    return;
+  }
+  if (!response.ok) {
+    throw new ExtractFailure("page-unavailable");
+  }
+  const bytes = await readBodyWithLimit(response, maxRobotsBytes);
+  // 上限を超えた robots.txt は途中までの規則で判定すると許可を誤るおそれがあるため、取得しない側に倒す
+  if (!bytes) {
+    throw new ExtractFailure("robots-disallowed");
+  }
+  if (!isAllowedByRobots(new TextDecoder().decode(bytes), robotsUserAgentToken, `${hopUrl.pathname}${hopUrl.search}`)) {
+    throw new ExtractFailure("robots-disallowed");
+  }
+}
+
+/**
+ * リダイレクトを自分で追いながら url を GET し、3xx でない最初のレスポンスを返す。
+ * 各回の URL を取得先として検査し (転送先の内部アドレスを拒否する)、beforeFetch を取得の前に呼ぶ。
+ * キャッシュを使わず (cache: no-store)、Cookie・認証情報を送らない
+ */
+async function fetchFollowingRedirects(
+  url: URL,
+  fetchPage: typeof fetch,
+  signal: AbortSignal,
+  beforeFetch: (hopUrl: URL) => Promise<void>,
+): Promise<Response> {
+  let hopUrl = url;
+  for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+    await beforeFetch(hopUrl);
+    const response = await fetchPage(hopUrl.toString(), {
+      method: "GET",
+      redirect: "manual",
+      cache: "no-store",
+      signal,
+      headers: { "User-Agent": userAgent, Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1" },
+    });
+    const location = response.headers.get("Location");
+    if (response.status < 300 || response.status >= 400 || location === null) {
+      return response;
+    }
+    // 転送元の本文は読まないため、接続を早く手放す
+    await response.body?.cancel();
+    const nextUrlCheck = checkTargetUrl(new URL(location, hopUrl).toString());
+    if (!nextUrlCheck.ok) {
+      throw new ExtractFailure(nextUrlCheck.error);
+    }
+    hopUrl = nextUrlCheck.url;
+  }
+  throw new ExtractFailure("page-unavailable");
+}
+
+/** レスポンスの本文を maxBytes まで読む。maxBytes を超えたら読むのをやめて undefined を返す */
+async function readBodyWithLimit(response: Response, maxBytes: number): Promise<Uint8Array | undefined> {
+  const contentLength = Number(response.headers.get("Content-Length"));
+  if (contentLength > maxBytes) {
+    await response.body?.cancel();
+    return undefined;
+  }
+  if (!response.body) {
+    return new Uint8Array();
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+/**
+ * HTML のバイト列を文字列にする。文字コードは Content-Type の charset、無ければ先頭 4 KB の meta の charset で決め、
+ * どちらも無い・未対応の名前なら UTF-8 で読む (日本語のサイトに残る Shift_JIS・EUC-JP のページを読むため)
+ */
+export function decodeHtml(bytes: Uint8Array, contentType: string): string {
+  // meta を探す範囲は、HTML の仕様が prescan に使う先頭 1024 バイトに、head の前に長いコメント等を置くページの分の余裕をみた 4 KB。
+  // 宣言が無いページの既定は、現在の Web のページの大半を占める UTF-8 にする
+  const charset =
+    /charset\s*=\s*["']?([\w.:-]+)/i.exec(contentType)?.[1] ??
+    /<meta[^>]+charset\s*=\s*["']?([\w.:-]+)/i.exec(new TextDecoder().decode(bytes.subarray(0, 4096)))?.[1] ??
+    "utf-8";
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    return new TextDecoder().decode(bytes);
+  }
+}
+
+/** JSON のレスポンスのヘッダー。origin が許可したオリジンなら CORS のヘッダーを付ける */
+function responseHeaders(origin: string | null): Headers {
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    Vary: "Origin",
+  });
+  if (origin !== null && allowedOrigins.has(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  }
+  return headers;
+}
+
+/** 失敗の理由を { error } の JSON と、理由に対応する status で返す */
+function errorResponse(extractError: ExtractError, origin: string | null): Response {
+  return new Response(JSON.stringify({ error: extractError }), {
+    status: errorStatuses[extractError],
+    headers: responseHeaders(origin),
+  });
+}
