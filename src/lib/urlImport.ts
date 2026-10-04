@@ -11,6 +11,9 @@ const extractErrors = new Set<ImportFailureReason>([
   "rate-limited",
 ]);
 
+// Worker の呼び出しの時間の上限。Worker 自身の取得の上限 (10 秒、worker/src/index.ts) に、ブラウザと Worker の間の通信の余裕を足した値
+const extractTimeoutMilliseconds = 20_000;
+
 /**
  * 入力された URL を、URL から本文を取り出す Worker (extractEndpoint は Worker のオリジン。NEXT_PUBLIC_EXTRACT_URL) に渡し、
  * 返ってきた本文を貼り付けと同じ経路で取り込む。title は本文の先頭の段落にする。
@@ -30,16 +33,26 @@ export async function importFromUrl(
   if (pageUrl.protocol !== "http:" && pageUrl.protocol !== "https:") {
     return { ok: false, reason: "invalid-url" };
   }
+  // 通信が止まっても「取得中」のまま戻れなくならないよう、レスポンスの本文を読み終えるまでに時間の上限を置く
+  const signal = AbortSignal.timeout(extractTimeoutMilliseconds);
   let response: Response;
   try {
     // extractEndpoint が URL として不正な配信の設定の誤りも、Worker に届かない失敗として扱う
     const requestUrl = new URL("/extract", extractEndpoint);
     requestUrl.searchParams.set("url", pageUrl.href);
-    response = await fetchExtract(requestUrl, { cache: "no-store", credentials: "omit" });
+    response = await fetchExtract(requestUrl, { cache: "no-store", credentials: "omit", signal });
   } catch {
     return { ok: false, reason: "network" };
   }
-  const body: unknown = await response.json().catch(() => undefined);
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    if (signal.aborted) {
+      return { ok: false, reason: "network" };
+    }
+    body = undefined;
+  }
   if (!response.ok) {
     return { ok: false, reason: extractFailureReason(response.status, body) };
   }

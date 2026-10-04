@@ -19,6 +19,8 @@ describe("importFromUrl", () => {
     expect(requestUrl.searchParams.get("url")).toBe("https://ja.wikipedia.org/wiki/%E9%80%9F%E8%AA%AD");
     expect([...requestUrl.searchParams.keys()]).toEqual(["url"]);
     expect(init).toMatchObject({ cache: "no-store", credentials: "omit" });
+    // 通信が止まった時に取得中のまま戻れなくならないよう、時間の上限付きの signal を渡す
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("本文の先頭の段落がタイトルと同じなら、タイトルを重ねない", async () => {
@@ -69,6 +71,13 @@ describe("importFromUrl", () => {
       fakeExtractFetch(200, { title: "速読の方法 - サンプルの百科事典", text: "速読の方法\n\n一段落目。" }),
     );
     expect(result).toEqual({ ok: true, text: "速読の方法\n\n一段落目。" });
+  });
+
+  it("時間の上限で取得を打ち切ったら network にする", async () => {
+    const fetchExtract = vi.fn(async () => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    expect(await importFromUrl("https://example.com/a", extractEndpoint, fetchExtract)).toEqual({ ok: false, reason: "network" });
   });
 
   it("Worker に接続できなければ network にする", async () => {
