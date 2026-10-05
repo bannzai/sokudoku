@@ -89,6 +89,35 @@ describe("importFromUrl", () => {
     expect(result).toEqual({ ok: true, text: "速読の方法\n\n一段落目。" });
   });
 
+  it("Worker の段落ごとの区切りの位置 (units) を、タイトルを足した本文の段落の順に並べて添える", async () => {
+    const result = await importFromUrl(
+      "https://example.com/a",
+      extractEndpoint,
+      fakeExtractFetch(200, { title: "速読の方法", text: "一段落目。\n\nEnglish paragraph.\n\n三段落目。", units: [[2], null, [3]] }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      text: "速読の方法\n\n一段落目。\n\nEnglish paragraph.\n\n三段落目。",
+      // タイトルの段落と、区切りの無い段落は BudouX で分ける
+      paragraphBoundaries: [null, [2], null, [3]],
+    });
+  });
+
+  it.each([
+    ["units が無い", undefined],
+    ["段落の数と合わない", [[2]]],
+    ["区切りが昇順でない", [[3, 2], null]],
+    ["区切りのある段落が無い", [null, null]],
+  ])("%s時は区切りの位置を添えない", async (_, units) => {
+    const result = await importFromUrl(
+      "https://example.com/a",
+      extractEndpoint,
+      fakeExtractFetch(200, { title: "", text: "一段落目。\n\n二段落目。", units }),
+    );
+    expect(result).toEqual({ ok: true, text: "一段落目。\n\n二段落目。" });
+    expect(result.ok && "paragraphBoundaries" in result).toBe(false);
+  });
+
   it("時間の上限で取得を打ち切ったら network にする", async () => {
     const fetchExtract = vi.fn(async () => {
       throw new DOMException("The operation was aborted due to timeout", "TimeoutError");

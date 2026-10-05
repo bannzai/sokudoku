@@ -2,14 +2,18 @@
 
 import { type DragEvent, type FormEvent, useRef, useState } from "react";
 import { type ImportResult, importFailureMessages, importFile, importPlainText } from "@/lib/importText";
+import type { ParagraphBoundaries } from "@/lib/readingUnits";
 import { importFromUrl } from "@/lib/urlImport";
 import buttonStyles from "./Button.module.css";
 import styles from "./TextImporter.module.css";
 
 /** 本文の取り込み部品に渡す値 */
 type TextImporterProps = {
-  /** 取り込めた本文を受け取る。本文はこの部品の外へ渡すだけで、保存も送信もしない */
-  onImport: (text: string) => void;
+  /**
+   * 取り込めた本文と、URL からの取り込みで Worker が LLM に区切らせた段落ごとの区切りの位置 (無ければ undefined) を受け取る。
+   * 本文はこの部品の外へ渡すだけで、保存も送信もしない
+   */
+  onImport: (text: string, paragraphBoundaries?: ParagraphBoundaries) => void;
 };
 
 /**
@@ -34,7 +38,7 @@ export function TextImporter({ onImport }: TextImporterProps) {
   function handleImportResult(result: ImportResult) {
     if (result.ok) {
       setErrorMessage(undefined);
-      onImport(result.text);
+      onImport(result.text, result.paragraphBoundaries);
     } else {
       setErrorMessage(importFailureMessages[result.reason]);
     }
