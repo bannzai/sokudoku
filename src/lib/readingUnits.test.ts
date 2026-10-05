@@ -5,6 +5,10 @@ import { segmentText } from "./readingUnits";
 const aozoraExcerpt =
   "　吾輩は猫である。名前はまだ無い。\n　どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。";
 
+// Wikipedia 日本語版「ニンニク」の冒頭の 2 段落 (CC BY-SA 4.0、2026-10-05 に取得)。出典番号 ([4] 等) は除いた
+const wikipediaGarlicExcerpt =
+  "ニンニク（大蒜、学名: Allium sativum）は、ヒガンバナ科ネギ属の多年草。香りが強く、強壮・スタミナ増進作用があると信じられているため、球根（鱗茎）を香辛料などとして食用にするほか、茎も「ニンニクの芽」（トウ）と呼ばれて野菜として調理される。強烈な風味を持つことから、肉食の習慣がある地域で肉類と併用し、臭みを消す食材、香辛料として普及している。強精効果の為、修行にならなくなるとして禅門では敬遠された過去がある。五葷・五辛の1つ。\n鱗茎（球根）の部分は世界各国で用いられる香辛料で、強い香りと風味を持つことから、肉食の習慣がある地域で普及している。古くから、疲労回復、強壮作用があることが知られており、古代エジプトや古代ギリシアでは、薬として使われていたといわれる。";
+
 /** 各単位の text が、元の文字列の start から end までと一致することを確かめる。 */
 function expectOffsetsMatchSource(source: string) {
   for (const unit of segmentText(source).units) {
@@ -18,13 +22,11 @@ describe("segmentText", () => {
     expect(units.map((unit) => unit.text)).toEqual([
       "吾輩は",
       "猫である。",
-      "名前は",
-      "まだ",
+      "名前はまだ",
       "無い。",
       "どこで",
       "生れたかとんと",
-      "見当が",
-      "つかぬ。",
+      "見当がつかぬ。",
       "何でも",
       "薄暗いじめじめした",
       "所で",
@@ -32,14 +34,12 @@ describe("segmentText", () => {
       "事だけは",
       "記憶している。",
     ]);
-    expect(units.map((unit) => unit.sentenceIndex)).toEqual([0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3]);
+    expect(units.map((unit) => unit.sentenceIndex)).toEqual([0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3]);
     expect(units.map((unit) => unit.pause)).toEqual([
       "none",
       "sentence",
       "none",
-      "none",
       "paragraph",
-      "none",
       "none",
       "none",
       "sentence",
@@ -59,6 +59,21 @@ describe("segmentText", () => {
     ]);
     expect(aozoraExcerpt.slice(sentences[1].start, sentences[1].end)).toBe("名前はまだ無い。");
     expectOffsetsMatchSource(aozoraExcerpt);
+  });
+
+  it("BudouX が独立させた付属的な語を前の単位に結合し、割れた括弧を閉じ括弧まで結合する", () => {
+    const texts = segmentText(wikipediaGarlicExcerpt).units.map((unit) => unit.text);
+    // 「食用にする」の後の「ほか、」、「信じられているため」の後の読点も同じ単位に入る
+    for (const phrase of ["香辛料などとして", "「ニンニクの芽」", "信じられているため", "食用にする", "習慣がある"]) {
+      expect(texts.some((text) => text.includes(phrase))).toBe(true);
+    }
+    // 結合すると長くなりすぎる (15 文字) ため、分けたままにする
+    expect(texts).toContain("強壮・スタミナ増進作用が");
+    expect(texts).toContain("あると");
+    const lengths = texts.map((text) => [...text].length);
+    expect(lengths.filter((length) => length <= 2).length).toBeLessThanOrEqual(5);
+    expect(lengths.filter((length) => length > 15)).toEqual([]);
+    expectOffsetsMatchSource(wikipediaGarlicExcerpt);
   });
 
   it("日本語の読点に間をとり、閉じ括弧を文末に含める", () => {

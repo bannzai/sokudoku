@@ -58,6 +58,7 @@ agent が作ったモック (`documents/design/mock-2026-10-01/index.html`。方
 | 2026-10-04 | 関門 2 デザイン | agent のモック (documents/design/mock-2026-10-01) の方向で反映する。Claude Design は使わない。細部は agent に任せる | bannzai |
 | 2026-10-05 | URL からの取り込み (#27・#28) | URL を貼ると本文を取り出して読めるようにし、取得と本文の抽出は Cloudflare Worker で行う (`documents/adr/0004-url-import-through-cloudflare-worker.md`) | bannzai |
 | 2026-10-05 | URL からの取り込み (#27・#28) | Worker は robots.txt が 5xx・接続の失敗のサイトと、5 MB を超える HTML・HTML でない応答を取得しない。失敗は理由の値 ({ error }) で返し、フロントが理由ごとの文言を出す。本文は段落ごとに空行で区切り、フロントはタイトルを先頭の段落にする (本文の先頭の段落がタイトルと同じなら重ねない)。URL の入口は貼り付け・ファイルの下に置く | agent |
+| 2026-10-05 | 文節分割の後処理 (#31) | BudouX の区切りの後に、ひらがなだけの短い単位と閉じ括弧・句読点で始まる単位を前に、閉じていない括弧を閉じ括弧まで後ろに結合する。品詞・付属語の表は持たず文字種と括弧の対応だけで判定する (`documents/adr/0003-japanese-bunsetsu-segmentation-with-budoux.md` に追記) | agent |
 
 ## agent に任せること
 
