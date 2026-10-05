@@ -37,12 +37,17 @@ const systemPrompt = [
   'units を先頭から順に連結すると入力と完全に一致するようにし、{"units": ["...", "..."]} の JSON だけを出力する。',
 ].join("\n");
 
+// Workers AI の Chat Completions 形式の入力の ResponseFormatJSONSchema ({ name, schema }) に合わせる
+// (https://raw.githubusercontent.com/cloudflare/workerd/main/types/defines/ai.d.ts )
 const responseFormat = {
   type: "json_schema",
   json_schema: {
-    type: "object",
-    properties: { units: { type: "array", items: { type: "string" } } },
-    required: ["units"],
+    name: "reading_units",
+    schema: {
+      type: "object",
+      properties: { units: { type: "array", items: { type: "string" } } },
+      required: ["units"],
+    },
   },
 };
 
@@ -101,6 +106,8 @@ async function segmentParagraph(ai: Ai, paragraph: string): Promise<number[] | n
           max_completion_tokens: maxCompletionTokens,
           // 区切りは毎回同じに近い方がよく、言い換えを誘う揺らぎは要らないため
           temperature: 0,
+          // Gemma 4 は推論が既定で有効 (ai.d.ts の enable_thinking の @default true)。区切りに推論は要らず、応答が時間の上限に収まるよう切る
+          chat_template_kwargs: { enable_thinking: false },
         }),
       ),
     );

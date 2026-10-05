@@ -97,9 +97,10 @@ const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 // 読みかけの本文を同時に持つ数として十分な数。1 件は 100 バイトほどで、localStorage の容量 (5MB 前後) を圧迫しない
 const maxReadingPositionCount = 100;
 
-// 区切りの位置を残す本文の数。1 件は Worker が区切らせる文字数の上限 (20,000 文字、worker/src/segment.ts) で 3,000 個ほどの位置の約 15KB で、
-// 50 件でも localStorage の容量 (5MB 前後) の 1 割台に収まる
-const maxSavedParagraphBoundariesCount = 50;
+// 区切りの位置を残す本文の数。読書位置を残す本文 (最大 maxReadingPositionCount) の区切りをすべて残せる数にする。
+// 1 件は Worker が区切らせる文字数の上限 (20,000 文字、worker/src/segment.ts) でも 3,000 個ほどの位置の約 15KB で、
+// 100 件が上限の大きさでも localStorage の容量 (5MB 前後) の 3 割ほどに収まる
+const maxSavedParagraphBoundariesCount = maxReadingPositionCount;
 
 /** 値が 0 以上の整数かを返す。 */
 function isNonNegativeInteger(value: unknown): value is number {
@@ -201,16 +202,25 @@ export function parseSavedParagraphBoundaries(json: string | null): SavedParagra
   ) as SavedParagraphBoundaries;
 }
 
-/** 本文の段落ごとの区切りの位置を書き込んだ対応を返す。上限を超えたら保存が古いものから捨てる。 */
+/**
+ * 本文の段落ごとの区切りの位置を書き込んだ対応を返す。上限を超えたら、読みかけでない本文 (readingTextHashes に無く、書き込む本文でもない) の
+ * 保存が古いものから捨て、それでも超える時は読みかけの本文の保存が古いものから捨てる。
+ * 読みかけの本文の区切りを捨てると、開き直した時に単位が変わり読書位置が消える・ずれるため。
+ */
 export function upsertParagraphBoundaries(
   saved: SavedParagraphBoundaries,
   textHash: string,
   paragraphBoundaries: ParagraphBoundaries,
   savedAt: number,
+  readingTextHashes: ReadonlySet<string>,
 ): SavedParagraphBoundaries {
+  const isKept = (entryTextHash: string) => entryTextHash === textHash || readingTextHashes.has(entryTextHash);
   return Object.fromEntries(
     Object.entries({ ...saved, [textHash]: { paragraphBoundaries, savedAt } })
-      .sort(([, left], [, right]) => right.savedAt - left.savedAt)
+      .sort(
+        ([leftTextHash, left], [rightTextHash, right]) =>
+          Number(isKept(rightTextHash)) - Number(isKept(leftTextHash)) || right.savedAt - left.savedAt,
+      )
       .slice(0, maxSavedParagraphBoundariesCount),
   );
 }
@@ -395,7 +405,7 @@ export function loadParagraphBoundaries(textHash: string): ParagraphBoundaries |
   return parseSavedParagraphBoundaries(readStorage(storageKeys.paragraphBoundaries))[textHash]?.paragraphBoundaries;
 }
 
-/** 本文の段落ごとの区切りの位置を保存する。 */
+/** 本文の段落ごとの区切りの位置を保存する。読書位置を保存している本文の区切りは、上限を超えても後回しに捨てる。 */
 export function saveParagraphBoundaries(textHash: string, paragraphBoundaries: ParagraphBoundaries, now: number) {
   writeStorage(
     storageKeys.paragraphBoundaries,
@@ -405,6 +415,7 @@ export function saveParagraphBoundaries(textHash: string, paragraphBoundaries: P
         textHash,
         paragraphBoundaries,
         now,
+        new Set(Object.keys(parseReadingPositions(readStorage(storageKeys.readingPositions)))),
       ),
     ),
   );

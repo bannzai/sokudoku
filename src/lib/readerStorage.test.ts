@@ -96,14 +96,20 @@ describe("段落ごとの区切りの位置", () => {
     expect(parseSavedParagraphBoundaries("[]")).toEqual({});
   });
 
-  it("書き込むと同じハッシュの区切りを上書きし、50 件を超えたら保存が古いものから捨てる", () => {
+  it("書き込むと同じハッシュの区切りを上書きし、100 件を超えたら読みかけでない本文の保存が古いものから捨てる", () => {
     const saved = Object.fromEntries(
-      Array.from({ length: 50 }, (_, index) => [`hash${index}`, { paragraphBoundaries: [[index + 1]], savedAt: index }]),
+      Array.from({ length: 100 }, (_, index) => [`hash${index}`, { paragraphBoundaries: [[index + 1]], savedAt: index }]),
     );
-    const updated = upsertParagraphBoundaries(saved, "new", [null, [2]], 1000);
-    expect(Object.keys(updated)).toHaveLength(50);
+    // 最も古い hash0 は読みかけのため残し、次に古い hash1 を捨てる
+    const updated = upsertParagraphBoundaries(saved, "new", [null, [2]], 1000, new Set(["hash0"]));
+    expect(Object.keys(updated)).toHaveLength(100);
     expect(updated.new).toEqual({ paragraphBoundaries: [null, [2]], savedAt: 1000 });
-    expect(updated.hash0).toBeUndefined();
+    expect(updated.hash0).toEqual({ paragraphBoundaries: [[1]], savedAt: 0 });
+    expect(updated.hash1).toBeUndefined();
+    expect(upsertParagraphBoundaries(updated, "new", [[4]], 1001, new Set()).new).toEqual({
+      paragraphBoundaries: [[4]],
+      savedAt: 1001,
+    });
   });
 
   it("開く時は保存した区切りを優先し、BudouX だけで読み始めた本文には受け取った区切りを使わない", () => {

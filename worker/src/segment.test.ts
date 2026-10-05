@@ -16,6 +16,21 @@ describe("segmentParagraphs", () => {
     expect(await segmentParagraphs(ai, ["吾輩は猫である。"])).toEqual([[3]]);
   });
 
+  it("Chat Completions 形式の入力 (messages・json_schema の name と schema・推論の無効化) で問い合わせる", async () => {
+    const ai = fakeAi(() => ({ response: { units: ["吾輩は", "猫である。"] } }));
+    await segmentParagraphs(ai, ["吾輩は猫である。"]);
+    const [model, inputs] = ai.run.mock.calls[0];
+    expect(model).toBe("@cf/google/gemma-4-26b-a4b-it");
+    expect(inputs).toMatchObject({
+      messages: [{ role: "system" }, { role: "user", content: "吾輩は猫である。" }],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: expect.any(String), schema: { type: "object", required: ["units"] } },
+      },
+      chat_template_kwargs: { enable_thinking: false },
+    });
+  });
+
   it("OpenAI 互換の choices の文字列の応答も、推論の部分とコードブロックの囲みを除いて読む", async () => {
     const ai = fakeAi(() => ({
       choices: [{ message: { content: '<think>区切る</think>\n```json\n{"units": ["名前は", "まだ無い。"]}\n```' } }],
