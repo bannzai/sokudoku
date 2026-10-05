@@ -22,7 +22,7 @@ import { segmentText } from "./readingUnits";
 
 const speed = { japaneseCharactersPerMinute: 600, englishWordsPerMinute: 300 };
 
-// 文 0: 吾輩は / 猫である。  文 1: 名前は / まだ / 無い。
+// 文 0: 吾輩は / 猫である。  文 1: 名前はまだ / 無い。
 const japaneseUnits = segmentText("吾輩は猫である。名前はまだ無い。").units;
 
 /** 停止中の状態から、指定した時刻に再生を始めた状態を作る。 */
@@ -46,7 +46,7 @@ describe("createReaderState", () => {
   it("停止中で始まり、前回の位置が単位の数を超えていれば最後の単位に収める", () => {
     const state = createReaderState({ units: japaneseUnits, unitIndex: 99, speed });
     expect(state.status).toBe("paused");
-    expect(state.unitIndex).toBe(4);
+    expect(state.unitIndex).toBe(3);
   });
 
   it("前回の続きから読む時は、前回までの再生時間と読んだ量を引き継いで読了まで足し続ける", () => {
@@ -107,7 +107,7 @@ describe("advance と読了", () => {
 
   it("最後の単位を表示し終えると読了にし、読了の時刻と再生していた時間を持つ", () => {
     const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 1000);
-    expect(finished).toMatchObject({ status: "finished", unitIndex: 4, playedMs: 3100, finishedAt: 4100 });
+    expect(finished).toMatchObject({ status: "finished", unitIndex: 3, playedMs: 3100, finishedAt: 4100 });
     expect(finished.readAmount.japaneseCharacters).toBe(16);
   });
 
@@ -134,7 +134,7 @@ describe("前後の移動", () => {
   it("1 単位ずつ移り、先頭・末尾より外へは出ない。再生中は再生したまま移る", () => {
     expect(moveByUnits(playingState(2), 1)).toMatchObject({ unitIndex: 3, status: "playing" });
     expect(moveByUnits(playingState(0), -1).unitIndex).toBe(0);
-    expect(moveByUnits(playingState(4), 1).unitIndex).toBe(4);
+    expect(moveByUnits(playingState(3), 1).unitIndex).toBe(3);
   });
 
   it("前の文へ: 文の途中なら今の文の先頭へ、文の先頭なら前の文の先頭へ移る", () => {
@@ -199,7 +199,7 @@ describe("unitIndexAtOffset", () => {
 
 describe("進み具合", () => {
   it("remainingDurationsMs は各単位から末尾までの表示時間の合計を返す", () => {
-    expect(remainingDurationsMs(japaneseUnits, speed)).toEqual([3100, 2800, 1800, 1500, 1300, 0]);
+    expect(remainingDurationsMs(japaneseUnits, speed)).toEqual([3100, 2800, 1800, 1300, 0]);
   });
 
   it("remainingFraction は現在の単位から末尾までの文字の割合を返す", () => {
