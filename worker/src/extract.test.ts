@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { articleHtml, articleParagraphs } from "./__fixtures__/articlePage";
+import { wikipediaHtml, wikipediaInfoboxCells, wikipediaParagraphs } from "./__fixtures__/wikipediaPage";
 import { extractArticle } from "./extract";
 
 describe("extractArticle", () => {
@@ -42,5 +43,31 @@ describe("extractArticle", () => {
   it("pre の中の改行は行ごとの段落にする", () => {
     const html = articleHtml.replace("</article>", "<pre>const a = 1;\n\nconst b = 2;</pre></article>");
     expect(extractArticle(html)?.text.split("\n\n").slice(-2)).toEqual(["const a = 1;", "const b = 2;"]);
+  });
+
+  it("Wikipedia の記事は、infobox・「出典: フリー百科事典…」の行より前に出さず本文の最初の段落から始める", () => {
+    expect(extractArticle(wikipediaHtml)?.text.split("\n\n")).toEqual([
+      wikipediaParagraphs[0],
+      wikipediaParagraphs[1],
+      "栽培",
+      wikipediaParagraphs[2],
+      "利用",
+      wikipediaParagraphs[3],
+    ]);
+  });
+
+  it("Wikipedia の出典番号・infobox の表のセル・見出しの [編集] リンクを本文に含めない", () => {
+    const text = extractArticle(wikipediaHtml)?.text ?? "";
+    expect(text).not.toMatch(/\[(注\s*)?\d+\]/);
+    for (const cell of wikipediaInfoboxCells) {
+      expect(text).not.toContain(cell);
+    }
+    expect(text).not.toContain("出典: フリー百科事典");
+    expect(text).not.toContain("[編集]");
+  });
+
+  it("角括弧だけでない上付き文字 (指数等) は本文に残す", () => {
+    const html = articleHtml.replace("</article>", "<p>この部屋の広さは 20m<sup>2</sup> ほどで、本を読むには十分な広さがある。</p></article>");
+    expect(extractArticle(html)?.text.split("\n\n").at(-1)).toBe("この部屋の広さは 20m2 ほどで、本を読むには十分な広さがある。");
   });
 });
