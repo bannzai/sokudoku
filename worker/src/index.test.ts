@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { articleHtml, articleParagraphs } from "./__fixtures__/articlePage";
-import { decodeHtml, type Env, handleRequest } from "./index";
+import { decodeHtml, type Env, handleRequest, rateLimitKeyForIp } from "./index";
 
 /** URL ごとに返すレスポンスを決めた fetch の代わり。呼ばれた URL と init を記録する */
 function fakeFetch(routes: Record<string, () => Response>) {
@@ -25,7 +25,8 @@ function fakeRateLimiter(allowedCount: number): Env["EXTRACT_RATE_LIMITER"] {
 }
 
 /**
- * Rate Limiting binding (取り込みの回数 allowedCount・区切らせる回数 segmentAllowedCount まで通す) と、Workers AI の binding の代わり。
+ * Rate Limiting binding (取り込みの回数 allowedCount・同じ IP の区切らせる回数 segmentAllowedCount・全体の区切らせる回数
+ * segmentGlobalAllowedCount まで通す) と、Workers AI の binding の代わり。
  * 回数は、回数の制限を確かめない test が制限に当たらないよう既定では無制限にする。
  * Workers AI は、区切りを確かめない test が LLM の応答に左右されないよう既定では失敗させ (全段落を null にする経路)、runAi を渡すとその応答を返す
  */
@@ -33,10 +34,12 @@ function fakeEnv(
   allowedCount = Number.POSITIVE_INFINITY,
   runAi: Env["AI"]["run"] = async () => Promise.reject(new Error("AI unavailable")),
   segmentAllowedCount = Number.POSITIVE_INFINITY,
+  segmentGlobalAllowedCount = Number.POSITIVE_INFINITY,
 ): Env {
   return {
     EXTRACT_RATE_LIMITER: fakeRateLimiter(allowedCount),
     SEGMENT_RATE_LIMITER: fakeRateLimiter(segmentAllowedCount),
+    SEGMENT_GLOBAL_RATE_LIMITER: fakeRateLimiter(segmentGlobalAllowedCount),
     AI: { run: runAi },
   };
 }
@@ -111,18 +114,36 @@ describe("handleRequest", () => {
     expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[2])]).toEqual([4, 32, 44]);
   });
 
-  it("区切らせる回数が上限を超えたら、Workers AI を呼ばずに本文を返し、units をすべて null にする", async () => {
+  it.each([
+    ["同じ IP の区切らせる回数", { segmentAllowedCount: 0, segmentGlobalAllowedCount: Number.POSITIVE_INFINITY }],
+    ["全体の区切らせる回数", { segmentAllowedCount: Number.POSITIVE_INFINITY, segmentGlobalAllowedCount: 0 }],
+  ])("%sが上限を超えたら、Workers AI を呼ばずに本文を返し、units をすべて null にする", async (_, counts) => {
     const fetchPage = fakeFetch({
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
     const runAi = vi.fn(fakeAi((paragraph) => [paragraph]));
-    const env = fakeEnv(Number.POSITIVE_INFINITY, runAi, 0);
+    const env = fakeEnv(Number.POSITIVE_INFINITY, runAi, counts.segmentAllowedCount, counts.segmentGlobalAllowedCount);
     const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
     expect(runAi).not.toHaveBeenCalled();
+  });
+
+  it("区切らせる回数の Rate Limiting binding が失敗しても、本文を返し units をすべて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const env: Env = {
+      ...fakeEnv(),
+      SEGMENT_RATE_LIMITER: { limit: async () => Promise.reject(new Error("rate limiter unavailable")) },
+    };
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
 
   it("Workers AI が失敗しても本文を返し、units をすべて null にする", async () => {
@@ -328,6 +349,21 @@ describe("handleRequest", () => {
     expect(notFound.status).toBe(404);
     const post = await handleRequest(extractRequest("https://example.com/", { method: "POST" }), fakeEnv(), fakeFetch({}));
     expect(post.status).toBe(405);
+  });
+});
+
+describe("rateLimitKeyForIp", () => {
+  it("IPv6 は下位 64 bit が違っても同じ /64 の key にする", () => {
+    expect(rateLimitKeyForIp("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitKeyForIp("2001:0db8:0001:0002:ffff:ffff:ffff:ffff")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitKeyForIp("2001:db8::1")).toBe("2001:db8:0:0::/64");
+  });
+
+  it("IPv4・IPv4 を埋め込んだ IPv6・IP が無い時・読めない値は、そのまま (無ければ unknown) にする", () => {
+    expect(rateLimitKeyForIp("203.0.113.1")).toBe("203.0.113.1");
+    expect(rateLimitKeyForIp("::ffff:203.0.113.1")).toBe("::ffff:203.0.113.1");
+    expect(rateLimitKeyForIp(null)).toBe("unknown");
+    expect(rateLimitKeyForIp("not:an:ip")).toBe("not:an:ip");
   });
 });
 

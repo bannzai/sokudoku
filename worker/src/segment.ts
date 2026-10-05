@@ -18,7 +18,8 @@ const japaneseCharacterPattern = /[\p{Script_Extensions=Hiragana}\p{Script_Exten
 
 // 1 記事で区切らせる段落の数の上限。Workers AI のテキスト生成の回数の上限 (アカウント・モデルごとに 1 分あたり 300 回、
 // https://developers.cloudflare.com/workers-ai/platform/limits/ ) の中で、1 分に 10 記事を区切らせられる数。
-// 1 つの IP が上限を使い切らないよう、区切らせる記事は同じ IP から 1 分に 3 件まで (wrangler.toml の SEGMENT_RATE_LIMITER。最大 90 回) にする
+// 区切らせる記事は同じ IP (IPv6 は /64) から 1 分に 2 件、全体で 1 分に 3 件 (最大 90 回) まで (wrangler.toml の SEGMENT_RATE_LIMITER・SEGMENT_GLOBAL_RATE_LIMITER)。
+// 利用者は bannzai 自身 (documents/DIRECTION.md の仮説) で、記事を開く頻度は 1 分に数件に収まる
 const maxParagraphCount = 30;
 // 1 段落の文字数の上限。区切った単位を JSON で返させるため出力は段落の 1.5 倍ほどのトークンになり、maxCompletionTokens に収まる長さにする。
 // Wikipedia の段落は 100〜400 文字が大半で、超える段落は BudouX に戻す

@@ -20,6 +20,7 @@ describe("handleRequest の本文の抽出の例外", () => {
       {
         EXTRACT_RATE_LIMITER: { limit: async () => ({ success: true }) },
         SEGMENT_RATE_LIMITER: { limit: async () => ({ success: true }) },
+        SEGMENT_GLOBAL_RATE_LIMITER: { limit: async () => ({ success: true }) },
         AI: { run: vi.fn() },
       },
       fetchPage,
