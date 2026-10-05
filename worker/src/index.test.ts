@@ -13,8 +13,15 @@ function fakeFetch(routes: Record<string, () => Response>) {
   });
 }
 
-/** 指定した回数まで通す Rate Limiting binding の代わり */
-function fakeEnv(allowedCount = Number.POSITIVE_INFINITY): Env {
+/**
+ * 指定した回数まで通す Rate Limiting binding と、Workers AI の binding の代わり。
+ * 回数は、回数の制限を確かめない test が制限に当たらないよう既定では無制限にする。
+ * Workers AI は、区切りを確かめない test が LLM の応答に左右されないよう既定では失敗させ (全段落を null にする経路)、runAi を渡すとその応答を返す
+ */
+function fakeEnv(
+  allowedCount = Number.POSITIVE_INFINITY,
+  runAi: Env["AI"]["run"] = async () => Promise.reject(new Error("AI unavailable")),
+): Env {
   let count = 0;
   return {
     EXTRACT_RATE_LIMITER: {
@@ -23,6 +30,15 @@ function fakeEnv(allowedCount = Number.POSITIVE_INFINITY): Env {
         return { success: count <= allowedCount };
       },
     },
+    AI: { run: runAi },
+  };
+}
+
+/** 段落を受け取り、区切った単位の文字列の配列を { response: { units } } で返す Workers AI の代わり */
+function fakeAi(splitParagraph: (paragraph: string) => string[]): Env["AI"]["run"] {
+  return async (_model, inputs) => {
+    const paragraph = (inputs.messages as { role: string; content: string }[]).find(({ role }) => role === "user")?.content ?? "";
+    return { response: { units: splitParagraph(paragraph) } };
   };
 }
 
@@ -56,6 +72,46 @@ describe("handleRequest", () => {
     const body = await response.json();
     expect(body).toMatchObject({ title: "速読の方法 - サンプルの百科事典", siteName: "サンプルの百科事典", lang: "ja" });
     expect(body.text).toContain(articleParagraphs[1]);
+  });
+
+  it("本文の段落ごとに Workers AI に区切らせた位置を units で返す", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    // 読点・句点の後ろで区切る
+    const env = fakeEnv(Number.POSITIVE_INFINITY, fakeAi((paragraph) => paragraph.match(/[^、。]+[、。]?/g) ?? []));
+    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
+    const paragraphs: string[] = body.text.split("\n\n");
+    expect(body.units).toHaveLength(paragraphs.length);
+    // 「速読とは、/ 文章を通常よりも速い速度で読み、/ 内容を理解する技術の総称である。/ 古くから様々な方法が提案されてきた。」
+    expect(body.units[paragraphs.indexOf(articleParagraphs[0])]).toEqual([5, 21, 37]);
+  });
+
+  it("区切りを連結した文字列が元の段落と一致しない応答 (本文の改変・脱落) は捨てて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const env = fakeEnv(
+      Number.POSITIVE_INFINITY,
+      fakeAi((paragraph) => [paragraph.slice(0, 5), paragraph.slice(5).replace("速読", "そくどく")]),
+    );
+    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
+    expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[0])]).toBeNull();
+    // 置き換える語の無い段落は連結すると一致するため、区切りを返す
+    expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[2])]).toEqual([5]);
+  });
+
+  it("Workers AI が失敗しても本文を返し、units をすべて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
 
   it("取得には User-Agent で名乗り、キャッシュを使わず、リダイレクトを自分で追う", async () => {

@@ -1,12 +1,13 @@
 import { extractArticle } from "./extract";
 import { isAllowedByRobots } from "./robots";
+import { type Ai, segmentParagraphs } from "./segment";
 import { checkTargetUrl } from "./targetUrl";
 
 /** Workers の Rate Limiting binding のうち、この Worker が使う API */
 type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
 /** wrangler.toml で Worker に結び付ける binding */
-export type Env = { EXTRACT_RATE_LIMITER: RateLimit };
+export type Env = { EXTRACT_RATE_LIMITER: RateLimit; AI: Ai };
 
 /**
  * 失敗の理由。フロント (src/lib/importText.ts の ImportFailureReason) がこの値で利用者に見せる文言を選ぶ。
@@ -73,8 +74,9 @@ const worker = {
 export default worker;
 
 /**
- * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
- * 取得した URL・本文はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)
+ * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, units, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
+ * units は text を空行で区切った段落ごとの、Workers AI に区切らせた位置 (ParagraphBoundaries。documents/adr/0005-llm-segmentation-for-url-import.md)。
+ * 取得した URL・本文・LLM の応答はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)
  */
 export async function handleRequest(request: Request, env: Env, fetchPage: typeof fetch): Promise<Response> {
   const origin = request.headers.get("Origin");
@@ -113,7 +115,10 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
     if (!article) {
       return errorResponse("unextractable", origin);
     }
-    return new Response(JSON.stringify(article), { status: 200, headers: responseHeaders(origin) });
+    return new Response(JSON.stringify({ ...article, units: await segmentParagraphs(env.AI, article.text.split("\n\n")) }), {
+      status: 200,
+      headers: responseHeaders(origin),
+    });
   } catch (error) {
     // タイムアウト・接続の失敗は、利用者から見るとページを取得できなかったことと同じため page-unavailable にまとめる
     return errorResponse(error instanceof ExtractFailure ? error.extractError : "page-unavailable", origin);

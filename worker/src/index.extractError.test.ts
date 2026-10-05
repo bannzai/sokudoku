@@ -17,7 +17,7 @@ describe("handleRequest の本文の抽出の例外", () => {
     );
     const response = await handleRequest(
       new Request(`https://sokudoku-extract.example.workers.dev/extract?url=${encodeURIComponent("https://example.com/deep")}`),
-      { EXTRACT_RATE_LIMITER: { limit: async () => ({ success: true }) } },
+      { EXTRACT_RATE_LIMITER: { limit: async () => ({ success: true }) }, AI: { run: vi.fn() } },
       fetchPage,
     );
     expect(response.status).toBe(422);

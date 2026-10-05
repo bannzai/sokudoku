@@ -14,6 +14,11 @@ enabled = false
 enabled = false
 invocation_logs = false
 
+# 取り出した本文の日本語の段落を区切らせる Workers AI (documents/adr/0005-llm-segmentation-for-url-import.md)。
+# 同じアカウントの binding のため API キー・secret は要らない
+[ai]
+binding = "AI"
+
 # 同じ IP から 1 分あたり 30 回まで。period は 10 か 60 だけを指定できる
 [[ratelimits]]
 name = "EXTRACT_RATE_LIMITER"
