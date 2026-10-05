@@ -6,7 +6,7 @@ describe("sitemap", () => {
   it("公開ページを basePath を含む絶対 URL で並べる", () => {
     expect(sitemap().map((entry) => entry.url)).toEqual([
       "https://bannzai.github.io/sokudoku/",
-      "https://bannzai.github.io/sokudoku/read/",
+      "https://bannzai.github.io/sokudoku/about/",
       "https://bannzai.github.io/sokudoku/terms/",
       "https://bannzai.github.io/sokudoku/privacy/",
     ]);
