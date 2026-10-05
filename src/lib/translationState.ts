@@ -77,7 +77,7 @@ export function containsEnglishSentence(sentences: readonly Sentence[]): boolean
   return sentences.some((sentence) => sentence.language === "en");
 }
 
-/** 今の文の訳が画面に出る状態かを返す。翻訳器を作り終えて表示中で、今の文が英文で、読了画面でない時だけ真。訳を出した回数の記録に使う。 */
+/** 今の文の訳が画面に出る状態かを返す。翻訳器を作り終えて表示中で、今の文が英文で、読了していない時だけ真。訳を出した回数の記録に使う。 */
 export function isTranslationDisplayed(
   state: TranslationState,
   params: { currentSentenceLanguage: Language; finished: boolean },
