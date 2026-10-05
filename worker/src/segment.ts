@@ -17,7 +17,8 @@ const segmentationModel = "@cf/google/gemma-4-26b-a4b-it";
 const japaneseCharacterPattern = /[\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}\p{Script_Extensions=Han}]/u;
 
 // 1 記事で区切らせる段落の数の上限。Workers AI のテキスト生成の回数の上限 (アカウント・モデルごとに 1 分あたり 300 回、
-// https://developers.cloudflare.com/workers-ai/platform/limits/ ) の中で、1 分に 10 記事を取り込める数
+// https://developers.cloudflare.com/workers-ai/platform/limits/ ) の中で、1 分に 10 記事を区切らせられる数。
+// 1 つの IP が上限を使い切らないよう、区切らせる記事は同じ IP から 1 分に 3 件まで (wrangler.toml の SEGMENT_RATE_LIMITER。最大 90 回) にする
 const maxParagraphCount = 30;
 // 1 段落の文字数の上限。区切った単位を JSON で返させるため出力は段落の 1.5 倍ほどのトークンになり、maxCompletionTokens に収まる長さにする。
 // Wikipedia の段落は 100〜400 文字が大半で、超える段落は BudouX に戻す
@@ -26,6 +27,11 @@ const maxParagraphLength = 1_000;
 const maxTotalLength = 20_000;
 // 1 段落の応答のトークンの上限。上限の 1,000 文字の段落を、単位ごとの引用符・区切りの記号を含めて返せる量
 const maxCompletionTokens = 4_096;
+// 1 単位の文字数 (コードポイント) の上限。BudouX と後処理の単位はニンニクの段落で最長 12 文字、括弧の結合の上限が 15 文字 (src/lib/readingUnits.ts) で、
+// その倍の 30 文字を超える単位は区切っていない (文・段落をまとめて返した) 応答として捨てる
+const maxUnitLength = 30;
+// 単位の先頭に来ない文字。読点・句点・閉じ括弧は前の単位に入れる指示 (systemPrompt) に反し、単独では読めない単位になるため、この文字で始まる単位を含む応答は捨てる
+const leadingClosingPattern = /^[、。，．！？!?」』）)】〕］\]”’]/u;
 // LLM への問い合わせ全体の時間の上限。ページの取得の上限 (10 秒、src/index.ts) と合わせても、フロントの待ち時間の上限 (30 秒、src/lib/urlImport.ts) に収まる長さ
 export const segmentationTimeoutMilliseconds = 10_000;
 
@@ -144,13 +150,20 @@ function parseJsonText(text: string): unknown {
 
 /**
  * 区切った単位の文字列の配列から、段落の中の区切りの位置を返す。
- * 空の単位を含む・文字列でない要素を含む・連結した文字列が段落と一致しない (本文の改変・脱落がある) なら null を返す
+ * 空の単位・文字列でない要素・maxUnitLength を超える単位・読点や閉じ括弧で始まる単位を含む、または連結した文字列が段落と一致しない
+ * (本文の改変・脱落がある) なら null を返す
  */
 function boundariesFromUnits(paragraph: string, units: unknown): number[] | null {
   if (
     !Array.isArray(units) ||
     units.length === 0 ||
-    !units.every((unit): unit is string => typeof unit === "string" && unit !== "") ||
+    !units.every(
+      (unit): unit is string =>
+        typeof unit === "string" &&
+        unit !== "" &&
+        [...unit.trim()].length <= maxUnitLength &&
+        !leadingClosingPattern.test(unit.trimStart()),
+    ) ||
     units.join("") !== paragraph
   ) {
     return null;

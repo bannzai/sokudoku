@@ -13,23 +13,30 @@ function fakeFetch(routes: Record<string, () => Response>) {
   });
 }
 
+/** 指定した回数まで通す Rate Limiting binding の代わり */
+function fakeRateLimiter(allowedCount: number): Env["EXTRACT_RATE_LIMITER"] {
+  let count = 0;
+  return {
+    limit: async () => {
+      count += 1;
+      return { success: count <= allowedCount };
+    },
+  };
+}
+
 /**
- * 指定した回数まで通す Rate Limiting binding と、Workers AI の binding の代わり。
+ * Rate Limiting binding (取り込みの回数 allowedCount・区切らせる回数 segmentAllowedCount まで通す) と、Workers AI の binding の代わり。
  * 回数は、回数の制限を確かめない test が制限に当たらないよう既定では無制限にする。
  * Workers AI は、区切りを確かめない test が LLM の応答に左右されないよう既定では失敗させ (全段落を null にする経路)、runAi を渡すとその応答を返す
  */
 function fakeEnv(
   allowedCount = Number.POSITIVE_INFINITY,
   runAi: Env["AI"]["run"] = async () => Promise.reject(new Error("AI unavailable")),
+  segmentAllowedCount = Number.POSITIVE_INFINITY,
 ): Env {
-  let count = 0;
   return {
-    EXTRACT_RATE_LIMITER: {
-      limit: async () => {
-        count += 1;
-        return { success: count <= allowedCount };
-      },
-    },
+    EXTRACT_RATE_LIMITER: fakeRateLimiter(allowedCount),
+    SEGMENT_RATE_LIMITER: fakeRateLimiter(segmentAllowedCount),
     AI: { run: runAi },
   };
 }
@@ -93,15 +100,29 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
-    // 6 文字目以降の「文章」を言い換える。articleParagraphs[0] は 6 文字目から「文章を…」が続くため改変される
+    // 読点・句点の後ろで区切り、「文章」を言い換える。articleParagraphs[0] は「文章を…」を含むため改変される
     const env = fakeEnv(
       Number.POSITIVE_INFINITY,
-      fakeAi((paragraph) => [paragraph.slice(0, 5), paragraph.slice(5).replace("文章", "ぶんしょう")]),
+      fakeAi((paragraph) => (paragraph.match(/[^、。]+[、。]?/g) ?? []).map((unit) => unit.replace("文章", "ぶんしょう"))),
     );
     const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
     expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[0])]).toBeNull();
-    // 置き換える語の無い段落は連結すると一致するため、区切りを返す
-    expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[2])]).toEqual([5]);
+    // 「文章」の無い段落は連結すると一致するため、区切りを返す (「一方で、/ 読む速度を…知られている。/ 自分に合った速度を選び、/ 必要なら…」)
+    expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[2])]).toEqual([4, 32, 44]);
+  });
+
+  it("区切らせる回数が上限を超えたら、Workers AI を呼ばずに本文を返し、units をすべて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const runAi = vi.fn(fakeAi((paragraph) => [paragraph]));
+    const env = fakeEnv(Number.POSITIVE_INFINITY, runAi, 0);
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
+    expect(runAi).not.toHaveBeenCalled();
   });
 
   it("Workers AI が失敗しても本文を返し、units をすべて null にする", async () => {

@@ -7,7 +7,7 @@ import { checkTargetUrl } from "./targetUrl";
 type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
 /** wrangler.toml で Worker に結び付ける binding */
-export type Env = { EXTRACT_RATE_LIMITER: RateLimit; AI: Ai };
+export type Env = { EXTRACT_RATE_LIMITER: RateLimit; SEGMENT_RATE_LIMITER: RateLimit; AI: Ai };
 
 /**
  * 失敗の理由。フロント (src/lib/importText.ts の ImportFailureReason) がこの値で利用者に見せる文言を選ぶ。
@@ -94,7 +94,8 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
     return errorResponse("method-not-allowed", origin);
   }
   // 回数を数えるためだけに IP を使い、記録はしない
-  const { success } = await env.EXTRACT_RATE_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") ?? "unknown" });
+  const rateLimitKey = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  const { success } = await env.EXTRACT_RATE_LIMITER.limit({ key: rateLimitKey });
   if (!success) {
     return errorResponse("rate-limited", origin);
   }
@@ -115,10 +116,12 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
     if (!article) {
       return errorResponse("unextractable", origin);
     }
-    return new Response(JSON.stringify({ ...article, units: await segmentParagraphs(env.AI, article.text.split("\n\n")) }), {
-      status: 200,
-      headers: responseHeaders(origin),
-    });
+    const paragraphs = article.text.split("\n\n");
+    // 区切らせる記事の回数の上限を超えたら、本文の取り込みは失敗にせず、全段落を null (フロントが BudouX で分ける) にする
+    const units = (await env.SEGMENT_RATE_LIMITER.limit({ key: rateLimitKey })).success
+      ? await segmentParagraphs(env.AI, paragraphs)
+      : paragraphs.map(() => null);
+    return new Response(JSON.stringify({ ...article, units }), { status: 200, headers: responseHeaders(origin) });
   } catch (error) {
     // タイムアウト・接続の失敗は、利用者から見るとページを取得できなかったことと同じため page-unavailable にまとめる
     return errorResponse(error instanceof ExtractFailure ? error.extractError : "page-unavailable", origin);

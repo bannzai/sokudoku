@@ -48,6 +48,18 @@ describe("segmentParagraphs", () => {
     expect(await segmentParagraphs(fakeAi(() => response), ["吾輩は猫である。"])).toEqual([null]);
   });
 
+  it("区切っていない応答 (30 文字を超える単位) と、読点・閉じ括弧で始まる単位を含む応答は捨てて null にする", async () => {
+    const longSentence = "吾輩は猫である名前はまだ無いどこで生れたかとんと見当がつかぬ何でも薄暗い所で泣いていた。";
+    expect(await segmentParagraphs(fakeAi(() => ({ response: { units: [longSentence] } })), [longSentence])).toEqual([null]);
+    const quoted = "「そうだ」と言った。";
+    expect(await segmentParagraphs(fakeAi(() => ({ response: { units: ["「そうだ", "」と言った。"] } })), [quoted])).toEqual([
+      null,
+    ]);
+    expect(await segmentParagraphs(fakeAi(() => ({ response: { units: ["「そうだ」と", "言った。"] } })), [quoted])).toEqual([
+      [6],
+    ]);
+  });
+
   it("Workers AI の呼び出しが失敗した段落は null にし、ほかの段落の区切りは返す", async () => {
     const ai = fakeAi((paragraph) => {
       if (paragraph === "失敗する段落。") {

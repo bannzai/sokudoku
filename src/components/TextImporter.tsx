@@ -180,7 +180,8 @@ export function TextImporter({ onImport }: TextImporterProps) {
       <div className={styles.footer}>
         <p className={styles.privacy}>
           本文はこのブラウザの中だけで処理します。サーバーには送らず、保存もしません。
-          {extractEndpoint && "URL から読む時だけ、ページの URL を取得用のサーバーへ送ります。"}
+          {extractEndpoint &&
+            "URL から読む時だけ、ページの URL を取得用のサーバーへ送ります。取得用のサーバーは、取り出したページの本文を表示の単位に区切るため AI (Cloudflare Workers AI) に渡します。"}
         </p>
         <button type="button" className={`${buttonStyles.button} ${buttonStyles.primary}`} onClick={importPastedText}>
           この本文を読む
