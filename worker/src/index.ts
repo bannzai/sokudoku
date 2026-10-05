@@ -1,6 +1,6 @@
 import { extractArticle } from "./extract";
 import { isAllowedByRobots } from "./robots";
-import { type Ai, segmentParagraphs } from "./segment";
+import { type Ai, segmentationTargets, segmentParagraphs } from "./segment";
 import { checkTargetUrl } from "./targetUrl";
 
 /** Workers の Rate Limiting binding のうち、この Worker が使う API */
@@ -126,8 +126,9 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
       return errorResponse("unextractable", origin);
     }
     const paragraphs = article.text.split("\n\n");
-    // 区切らせる記事の回数の上限を超えたら、本文の取り込みは失敗にせず、全段落を null (フロントが BudouX で分ける) にする
-    const units = (await canSegment(env, rateLimitKey))
+    // 区切らせる段落が無い記事 (英語だけ等) は回数を数えない。区切らせる記事の回数の上限を超えたら、
+    // 本文の取り込みは失敗にせず、全段落を null (フロントが BudouX で分ける) にする
+    const units = segmentationTargets(paragraphs).some(Boolean) && (await canSegment(env, rateLimitKey))
       ? await segmentParagraphs(env.AI, paragraphs)
       : paragraphs.map(() => null);
     return new Response(JSON.stringify({ ...article, units }), { status: 200, headers: responseHeaders(origin) });

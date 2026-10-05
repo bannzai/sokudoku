@@ -131,6 +131,25 @@ describe("handleRequest", () => {
     expect(runAi).not.toHaveBeenCalled();
   });
 
+  it("区切らせる段落が無い記事 (英語だけ) では、区切らせる回数を数えない", async () => {
+    const englishParagraph =
+      "Rapid serial visual presentation shows words one at a time in the same position, so the reader does not move the eyes across the page.";
+    const englishHtml = `<!doctype html><html lang="en"><head><title>RSVP</title></head><body><article><h1>RSVP</h1>${Array.from(
+      { length: 6 },
+      () => `<p>${englishParagraph}</p>`,
+    ).join("")}</article></body></html>`;
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/english": () => htmlResponse(englishHtml),
+    });
+    const segmentLimit = vi.fn(async () => ({ success: true }));
+    const env: Env = { ...fakeEnv(), SEGMENT_RATE_LIMITER: { limit: segmentLimit }, SEGMENT_GLOBAL_RATE_LIMITER: { limit: segmentLimit } };
+    const response = await handleRequest(extractRequest("https://example.com/english"), env, fetchPage);
+    expect(response.status).toBe(200);
+    expect((await response.json()).text).toContain(englishParagraph);
+    expect(segmentLimit).not.toHaveBeenCalled();
+  });
+
   it("区切らせる回数の Rate Limiting binding が失敗しても、本文を返し units をすべて null にする", async () => {
     const fetchPage = fakeFetch({
       "https://example.com/robots.txt": robotsNotFound,

@@ -68,21 +68,7 @@ export async function segmentParagraphs(
   paragraphs: readonly string[],
   timeoutMilliseconds = segmentationTimeoutMilliseconds,
 ): Promise<ParagraphBoundaries> {
-  let remainingCount = maxParagraphCount;
-  let remainingLength = maxTotalLength;
-  const targets = paragraphs.map((paragraph) => {
-    if (
-      !japaneseCharacterPattern.test(paragraph) ||
-      paragraph.length > maxParagraphLength ||
-      remainingCount === 0 ||
-      paragraph.length > remainingLength
-    ) {
-      return false;
-    }
-    remainingCount -= 1;
-    remainingLength -= paragraph.length;
-    return true;
-  });
+  const targets = segmentationTargets(paragraphs);
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<null>((resolve) => {
     timeoutId = setTimeout(() => resolve(null), timeoutMilliseconds);
@@ -96,6 +82,29 @@ export async function segmentParagraphs(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * 段落ごとに、LLM に区切らせる対象かを返す。仮名・漢字を含み、1 段落の文字数の上限以下で、
+ * 先頭からの段落数・文字数の合計が 1 記事の上限に収まる段落が対象。segmentParagraphs が LLM を 1 回も呼ばない記事 (すべて false) で、
+ * 区切らせる回数の上限を数えないために、呼び出し側も使う
+ */
+export function segmentationTargets(paragraphs: readonly string[]): boolean[] {
+  let remainingCount = maxParagraphCount;
+  let remainingLength = maxTotalLength;
+  return paragraphs.map((paragraph) => {
+    if (
+      !japaneseCharacterPattern.test(paragraph) ||
+      paragraph.length > maxParagraphLength ||
+      remainingCount === 0 ||
+      paragraph.length > remainingLength
+    ) {
+      return false;
+    }
+    remainingCount -= 1;
+    remainingLength -= paragraph.length;
+    return true;
+  });
 }
 
 /** 1 つの段落を LLM に区切らせ、検証を通った区切りの位置を返す。失敗・検証に通らない応答は null を返す */
