@@ -103,6 +103,15 @@ describe("importFromUrl", () => {
     });
   });
 
+  it("同じ文字列の段落は、後の段落の区切りが null でも、先の段落の区切りを使う", async () => {
+    const result = await importFromUrl(
+      "https://example.com/a",
+      extractEndpoint,
+      fakeExtractFetch(200, { title: "", text: "同じ段落。\n\n別の段落。\n\n同じ段落。", units: [[2], null, null] }),
+    );
+    expect(result).toMatchObject({ ok: true, paragraphBoundaries: [[2], null, [2]] });
+  });
+
   it.each([
     ["units が無い", undefined],
     ["段落の数と合わない", [[2]]],

@@ -83,6 +83,7 @@ export async function importFromUrl(
 /**
  * Worker が本文 (workerText を空行で区切った段落の順) に付けた区切りの位置 (units) を、取り込んだ本文 (importedText) の段落の順に並べ直す。
  * タイトルを先頭に足す・前後の空白を除くなどで段落の位置が変わるため、段落の文字列が一致するものに対応させ、一致しない段落は null (BudouX で分ける) にする。
+ * 同じ文字列の段落は、Worker がどれか 1 つでも区切っていれば、すべてにその区切りを使う。
  * units が無い・形が違う・段落の数が合わない・区切りのある段落が 1 つも無い時は undefined を返す
  */
 function alignParagraphBoundaries(
@@ -94,7 +95,11 @@ function alignParagraphBoundaries(
   if (!isParagraphBoundaries(units) || units.length !== workerParagraphs.length) {
     return undefined;
   }
-  const boundariesByParagraph = new Map(workerParagraphs.map((paragraph, index) => [paragraph, units[index]]));
+  // 同じ文字列の段落が複数ある時は、区切りのある方を残す。区切りの位置は段落の文字列だけで決まるため、同じ文字列の段落のどれにも使える
+  const boundariesByParagraph = new Map<string, readonly number[] | null>();
+  for (const [index, paragraph] of workerParagraphs.entries()) {
+    boundariesByParagraph.set(paragraph, boundariesByParagraph.get(paragraph) ?? units[index]);
+  }
   const paragraphBoundaries = paragraphMatches(importedText).map(
     (paragraph) => boundariesByParagraph.get(paragraph[0]) ?? null,
   );
