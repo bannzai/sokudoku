@@ -93,9 +93,10 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
+    // 6 文字目以降の「文章」を言い換える。articleParagraphs[0] は 6 文字目から「文章を…」が続くため改変される
     const env = fakeEnv(
       Number.POSITIVE_INFINITY,
-      fakeAi((paragraph) => [paragraph.slice(0, 5), paragraph.slice(5).replace("速読", "そくどく")]),
+      fakeAi((paragraph) => [paragraph.slice(0, 5), paragraph.slice(5).replace("文章", "ぶんしょう")]),
     );
     const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
     expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[0])]).toBeNull();
