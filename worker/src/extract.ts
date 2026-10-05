@@ -11,7 +11,6 @@ const blockTagNames = new Set([
   "ARTICLE",
   "ASIDE",
   "BLOCKQUOTE",
-  "CAPTION",
   "DD",
   "DETAILS",
   "DIV",
@@ -35,15 +34,21 @@ const blockTagNames = new Set([
   "P",
   "SECTION",
   "SUMMARY",
-  "TABLE",
-  "TD",
-  "TH",
-  "TR",
   "UL",
 ]);
 
-// 読む文字を持たない要素。Readability が除いた後に残っていても本文に入れない
-const skippedTagNames = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG", "MATH", "RT", "RP"]);
+// 読む文字を持たない要素と、表。Readability が除いた後に残っていても本文に入れない。
+// 表 (Wikipedia の infobox・navbox 等) はセルの文字が文脈なしに並ぶだけで、RSVP で 1 単位ずつ読む対象にならない。
+// Readability は見出しのセル (th) を持つ表をデータの表とみなして本文に残すため、ここで落とす
+const skippedTagNames = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG", "MATH", "RT", "RP", "TABLE"]);
+
+/** 文字が角括弧で囲まれた部分だけの上付き文字。Wikipedia の出典番号 ([4]・[注 1]) や [要出典] のような注記のマーカー */
+const bracketOnlySupPattern = /^\[[^[\]]+\]$/;
+
+// MediaWiki (Wikipedia 等) の「出典: フリー百科事典『ウィキペディア（Wikipedia）』」の行と、見出しの [編集] リンク。
+// どちらも本文と同じ普通の文字の要素で、要素の種類や文字の形の汎用の規則では本文と見分けられないため、MediaWiki が付ける id・class で落とす。
+// Readability は出力から class を除くため、Readability に渡す前の DOM から落とす
+const mediaWikiChromeSelector = "#siteSub, .mw-editsection";
 
 /** 日本語の文字 (漢字・ひらがな・カタカナ・全角の記号) に挟まれた、改行を含む空白の並び。前の文字を $1 に取る */
 const cjkLineBreakPattern =
@@ -55,6 +60,9 @@ const cjkLineBreakPattern =
  */
 export function extractArticle(html: string): ExtractedArticle | undefined {
   const { document } = parseHTML(html);
+  for (const element of Array.from(document.querySelectorAll(mediaWikiChromeSelector))) {
+    element.remove();
+  }
   // linkedom の Document は DOM の Document の型と一致しないが、Readability が使う API は備えている
   const article = new Readability(document as unknown as Document).parse();
   if (!article?.content) {
@@ -100,6 +108,9 @@ function htmlToParagraphs(contentHtml: string): string[] {
     }
     const tagName = (node as Element).tagName.toUpperCase();
     if (skippedTagNames.has(tagName)) {
+      return;
+    }
+    if (tagName === "SUP" && bracketOnlySupPattern.test((node.textContent ?? "").trim())) {
       return;
     }
     if (tagName === "BR") {
