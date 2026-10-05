@@ -26,6 +26,7 @@ Accepted
 - Worker の配信 (ユーザー作業 #12 の Secrets 登録) までは LLM を呼べないため、モデルは暫定 (`worker/src/segment.ts` の `segmentationModel`)。配信後に、ニンニクの段落で BudouX (後処理あり) と LLM の単位の一覧を比べて issue #32 のコメントに書き、区切りの品質と速度でモデルを決め直す
 - Workers AI のテキスト生成の回数の上限は、アカウント・モデルごとに 1 分あたり 300 回 (https://developers.cloudflare.com/workers-ai/platform/limits/ )。1 記事で最大 30 回呼び、区切らせる記事は全体で 1 分に 3 件 (90 回) までに抑える。`Promise.race` で時間の上限を過ぎた呼び出しは応答を待たないだけで、呼び出し自体は止まらず回数・課金に数えられる
 - 費用の見積もり (2026-10-05 の `@cf/google/gemma-4-26b-a4b-it` の料金、入力 100 万トークンあたり $0.10・出力 $0.30。日本語は 1 文字 1 トークン前後とみなす): 上限いっぱいの記事 (20,000 文字) は入力約 2.7 万・出力約 3 万トークンで 1 件約 $0.012。全体の上限 (1 分 3 件) で 1 日休まず区切らせ続けても約 4,300 件・約 $51 で、Wikipedia の数千文字の記事なら 1 件 $0.003 前後
-- Rate Limiting binding の回数は Cloudflare のロケーションごとに数えられ、厳密ではない (https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/ )。複数のロケーションから呼ばれると、全体の上限はロケーションの数だけ緩くなる。厳密な費用の上限が要る時は、アカウント側の費用の上限の設定か AI Gateway を使う別の決定にする無料枠を超えた分は Workers の課金に入る
+- Rate Limiting binding の回数は Cloudflare のロケーションごとに数えられ、厳密ではない (https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/ )。複数のロケーションから呼ばれると、全体の上限はロケーションの数だけ緩くなる。厳密な費用の上限が要る時は、アカウント側の費用の上限の設定か AI Gateway を使う別の決定にする。無料枠を超えた分は Workers の課金に入る
+- 全体の上限は利用者全員で共有するため、別々の IP から 1 分に数件呼ばれるだけで埋まり、その間は正規の利用者の記事も区切られず BudouX に戻る (本文の取り込み自体は成功する)。利用者は bannzai 自身 (documents/DIRECTION.md の仮説) で、費用を抑える方を優先してこの可用性の低下を受け入れる
 - 同じ記事を取り込み直すと、フロントが保存した区切りを使う場合でも、Worker は LLM に問い合わせ直す (フロントは Worker の応答を受け取るまで本文を知らず、問い合わせを省けない)
 - `/extract` の応答の時間が LLM の分 (最大 10 秒) 延びるため、フロントの待ち時間の上限を 20 秒から 30 秒にする
