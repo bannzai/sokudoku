@@ -493,8 +493,11 @@ export function ReadingSession({
       if (event.ctrlKey || event.metaKey || event.altKey || !(event.target instanceof Element)) {
         return;
       }
-      // 入力欄のキー操作と、キーボードで選んだボタンの space での押下は、ブラウザの動作に任せる
-      if (event.target.closest("input, textarea, select") || (event.key === " " && event.target.closest("button"))) {
+      // 入力欄のキー操作と、キーボードで選んだボタン・記録の開閉欄の space での押下は、ブラウザの動作に任せる
+      if (
+        event.target.closest("input, textarea, select") ||
+        (event.key === " " && event.target.closest("button, summary"))
+      ) {
         return;
       }
       if (hasEnglishSentence && readerState.status !== "finished" && event.key.toLowerCase() === "t") {
