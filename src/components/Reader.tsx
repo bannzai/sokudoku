@@ -50,6 +50,7 @@ export function Reader() {
           <h1 className={styles.title}>読む本文を選ぶ</h1>
           <TextImporter onImport={(source) => void openText(source)} />
           <nav className={styles.legalLinks}>
+            <Link href="/about/">このサービスについて</Link>
             <Link href="/terms/">利用規約</Link>
             <Link href="/privacy/">プライバシーポリシー</Link>
           </nav>
