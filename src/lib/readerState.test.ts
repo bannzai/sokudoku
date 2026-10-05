@@ -125,6 +125,15 @@ describe("advance と読了", () => {
     );
   });
 
+  it("読了後に移る先が最後の単位のままなら読了のままにし、全文で最後の単位を選んだ時はそこから読み直す", () => {
+    const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 0);
+    expect(moveByUnits(finished, 1)).toBe(finished);
+    expect(moveBySentence(finished, "next")).toBe(finished);
+    expect(playFrom(finished, 3, 5000)).toEqual(
+      play(createReaderState({ units: japaneseUnits, unitIndex: 3, speed }), 5000),
+    );
+  });
+
   it("読了後も速度を変えられ、読了のままにする", () => {
     const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 0);
     expect(stepSpeed(finished, ["ja"], 1)).toEqual({ ...finished, speed: { ...speed, japaneseCharactersPerMinute: 650 } });

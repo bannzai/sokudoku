@@ -168,12 +168,14 @@ export function advance(state: ReaderState, now: number): ReaderState {
 /**
  * 指定した単位へ移る。範囲外は先頭・末尾に収める。再生中は再生したまま移る。
  * 読了後は、読んだ量と再生した時間を捨てた停止中の状態で移り、移った先からの読み直しにする (前の読了は記録済みのため)。
+ * 読了後に移る先が今の単位 (最後の単位) のままなら、読了の表示を消さないよう何もしない。
  */
 function moveTo(state: ReaderState, unitIndex: number): ReaderState {
-  return {
-    ...(state.status === "finished" ? restart(state) : state),
-    unitIndex: clamp(unitIndex, 0, state.units.length - 1),
-  };
+  const destinationUnitIndex = clamp(unitIndex, 0, state.units.length - 1);
+  if (state.status !== "finished") {
+    return { ...state, unitIndex: destinationUnitIndex };
+  }
+  return destinationUnitIndex === state.unitIndex ? state : { ...restart(state), unitIndex: destinationUnitIndex };
 }
 
 /** 単位の数だけ前後へ移る (負の数で前へ)。 */
@@ -216,7 +218,8 @@ export function moveBySentence(state: ReaderState, direction: "previous" | "next
 
 /** 停止中の全文で選んだ単位から再生を始める。 */
 export function playFrom(state: ReaderState, unitIndex: number, now: number): ReaderState {
-  return play(moveTo(state, unitIndex), now);
+  // 読了後に最後の単位を選んだ時も、先頭からではなく選んだ単位から読み直すため、先に読了を解く
+  return play(moveTo(state.status === "finished" ? restart(state) : state, unitIndex), now);
 }
 
 /**
