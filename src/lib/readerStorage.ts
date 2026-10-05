@@ -215,6 +215,22 @@ export function upsertParagraphBoundaries(
   );
 }
 
+/**
+ * 本文を開く時に使う区切りの位置を返す。保存した区切り (saved) があればそれを、無ければ受け取った区切り (received) を返す。
+ * ただし区切りを保存せずに BudouX だけで読み始めた本文 (startedWithoutBoundaries) には undefined (BudouX で分ける) を返す。
+ * 受け取った区切りに切り替えると単位が変わり、単位の数で照合する読書位置が消える・ずれるため。
+ */
+export function paragraphBoundariesForOpening(
+  saved: ParagraphBoundaries | undefined,
+  received: ParagraphBoundaries | undefined,
+  startedWithoutBoundaries: boolean,
+): ParagraphBoundaries | undefined {
+  if (saved !== undefined) {
+    return saved;
+  }
+  return startedWithoutBoundaries ? undefined : received;
+}
+
 /** 指定した時刻の日を、英文を読んだ日にした記録を返す。その日の訳を出した回数は変えない。 */
 export function addEnglishReadingDay(days: EnglishReadingDays, now: number): EnglishReadingDays {
   const date = localDateKey(now);

@@ -11,6 +11,7 @@ import {
   loadParagraphBoundaries,
   loadReadingPosition,
   loadReadingSpeed,
+  paragraphBoundariesForOpening,
   type ReadingPosition,
   saveParagraphBoundaries,
 } from "@/lib/readerStorage";
@@ -38,15 +39,25 @@ export function Reader() {
 
   /**
    * 取り込んだ本文を分割し、保存した速度と前回の位置を読んで再生の画面を開く。
-   * 同じ本文の区切りの位置を保存済みなら、受け取った区切りの位置 (paragraphBoundaries) より保存済みを使い、開き直しても単位と読書位置を変えない。
+   * 使う区切りの位置は paragraphBoundariesForOpening で決め、開き直しても単位と読書位置を変えない。受け取った区切りの位置を使う時は保存する。
    */
   async function openText(source: string, paragraphBoundaries?: ParagraphBoundaries) {
     const textHash = await hashText(source);
     const savedParagraphBoundaries = loadParagraphBoundaries(textHash);
-    if (savedParagraphBoundaries === undefined && paragraphBoundaries !== undefined) {
-      saveParagraphBoundaries(textHash, paragraphBoundaries, Date.now());
+    // BudouX だけの分割での読書位置を探すのは、区切りの位置を受け取ったが保存が無い時だけにし、ほかの時に本文を 2 回分割しない
+    const startedWithoutBoundaries =
+      savedParagraphBoundaries === undefined &&
+      paragraphBoundaries !== undefined &&
+      loadReadingPosition(textHash, segmentText(source).units.length) !== undefined;
+    const usedParagraphBoundaries = paragraphBoundariesForOpening(
+      savedParagraphBoundaries,
+      paragraphBoundaries,
+      startedWithoutBoundaries,
+    );
+    if (savedParagraphBoundaries === undefined && usedParagraphBoundaries !== undefined) {
+      saveParagraphBoundaries(textHash, usedParagraphBoundaries, Date.now());
     }
-    const segmentedText = segmentText(source, savedParagraphBoundaries ?? paragraphBoundaries);
+    const segmentedText = segmentText(source, usedParagraphBoundaries);
     setOpenedText({
       source,
       segmentedText,

@@ -6,6 +6,7 @@ import {
   type FinishedReading,
   hashText,
   localDateKey,
+  paragraphBoundariesForOpening,
   parseEnglishReadingDays,
   parseFinishedReadings,
   parseReadingPositions,
@@ -103,6 +104,15 @@ describe("段落ごとの区切りの位置", () => {
     expect(Object.keys(updated)).toHaveLength(50);
     expect(updated.new).toEqual({ paragraphBoundaries: [null, [2]], savedAt: 1000 });
     expect(updated.hash0).toBeUndefined();
+  });
+
+  it("開く時は保存した区切りを優先し、BudouX だけで読み始めた本文には受け取った区切りを使わない", () => {
+    const saved = [[3]];
+    const received = [[5]];
+    expect(paragraphBoundariesForOpening(saved, received, false)).toBe(saved);
+    expect(paragraphBoundariesForOpening(undefined, received, false)).toBe(received);
+    expect(paragraphBoundariesForOpening(undefined, received, true)).toBeUndefined();
+    expect(paragraphBoundariesForOpening(undefined, undefined, false)).toBeUndefined();
   });
 });
 
