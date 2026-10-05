@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - run: make setup
       - run: make lint
@@ -27,3 +30,5 @@ jobs:
       # next build が生成する next-env.d.ts を参照するため build-web の後に実行する
       - run: make typecheck
       - run: make test
+      - run: make typecheck-worker
+      - run: make test-worker

@@ -1,7 +1,7 @@
 import { isAozoraBunkoText, stripAozoraBunkoNotation } from "./aozoraBunko";
 import { extractEpubText } from "./epub";
 
-/** 本文を取り込めなかった理由 */
+/** 本文を取り込めなかった理由。URL からの取り込みの理由 (invalid-url 以降) は network を除き Worker の ExtractError (worker/src/index.ts) と同じ値 */
 export type ImportFailureReason =
   | "empty"
   | "drm"
@@ -9,7 +9,15 @@ export type ImportFailureReason =
   | "too-large"
   | "unsupported-encoding"
   | "unsupported-file"
-  | "unreadable-file";
+  | "unreadable-file"
+  | "invalid-url"
+  | "blocked-url"
+  | "robots-disallowed"
+  | "page-too-large"
+  | "page-unavailable"
+  | "unextractable"
+  | "rate-limited"
+  | "network";
 
 /** 取り込みの結果。成功時の text がリーダー画面へ渡す本文 */
 export type ImportResult = { ok: true; text: string } | { ok: false; reason: ImportFailureReason };
@@ -23,6 +31,14 @@ export const importFailureMessages: Record<ImportFailureReason, string> = {
   "unsupported-encoding": "文字コードを判定できませんでした (UTF-8 と Shift_JIS に対応)",
   "unsupported-file": "txt と EPUB のファイルだけ読み込めます",
   "unreadable-file": "ファイルを読み込めませんでした",
+  "invalid-url": "http:// か https:// で始まる URL を入力してください",
+  "blocked-url": "この URL のページは読み込めません",
+  "robots-disallowed": "このサイトは自動での取得を許可していないため読み込めません",
+  "page-too-large": "ページが大きすぎて読み込めません",
+  "page-unavailable": "ページを取得できませんでした (ログインが必要なページや有料のページは読めません)",
+  unextractable: "このページから本文を取り出せませんでした",
+  "rate-limited": "読み込みが続いたため 1 分ほど待ってから試してください",
+  network: "取得用のサーバーから応答を受け取れませんでした",
 };
 
 // 青空文庫のテキストは Shift_JIS が多く、それ以外のテキストは UTF-8 が大半のため、この 2 つを順に試す

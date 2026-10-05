@@ -1,0 +1,61 @@
+name: deploy-worker
+
+# worker/ (URL から本文を取り出す Cloudflare Worker) の変更が main に入った時に wrangler deploy する
+# (documents/adr/0004-url-import-through-cloudflare-worker.md)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同じ Worker を同時に差し替えないよう、実行中の配信は待ってから続ける
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # secrets は step の if で直接参照できないため、step の env に写した値で判定する。
+      # secret の登録 (ユーザー作業) が済むまでは失敗にせず、配信を飛ばしたことだけを残す。
+      # 依存の install script に token を読ませないよう、secret はこの step と配信の step にだけ渡す
+      - name: secret の登録を確認する
+        id: secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID が未登録のため、Worker の配信を飛ばした"
+          fi
+
+      - if: steps.secrets.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - if: steps.secrets.outputs.configured == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - if: steps.secrets.outputs.configured == 'true'
+        run: npm ci --prefix worker
+
+      - if: steps.secrets.outputs.configured == 'true'
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # wrangler の利用状況の送信を止める
+          WRANGLER_SEND_METRICS: "false"
+        run: npm run deploy

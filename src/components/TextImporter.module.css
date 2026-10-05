@@ -72,6 +72,33 @@
   color: var(--color-muted);
 }
 
+.urlSection {
+  display: grid;
+  gap: 8px;
+}
+
+.urlForm {
+  display: flex;
+  gap: 12px;
+}
+
+.urlInput {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.urlInput:focus {
+  border-color: var(--color-accent);
+}
+
 .error {
   margin: 0;
   color: var(--color-error);

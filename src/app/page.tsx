@@ -68,7 +68,12 @@ export default function HomePage() {
         <ul className={styles.steps}>
           <li className={styles.step}>
             <h3 className={styles.stepTitle}>文章を入れる</h3>
-            <p>読みたい文章を貼り付けるか、テキストファイル (青空文庫の txt を含む) や EPUB を読み込みます。DRM の付いた電子書籍は読み込めません。</p>
+            <p>
+              読みたい文章を貼り付けるか、テキストファイル (青空文庫の txt を含む) や EPUB を読み込みます。
+              {/* URL からの取り込みは、Worker の URL を渡した配信のビルドだけにある (src/components/TextImporter.tsx) */}
+              {process.env.NEXT_PUBLIC_EXTRACT_URL && "Web の記事は URL を入れると本文を取り出して読めます。"}
+              DRM の付いた電子書籍は読み込めません。
+            </p>
           </li>
           <li className={styles.step}>
             <h3 className={styles.stepTitle}>

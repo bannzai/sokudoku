@@ -1,0 +1,24 @@
+# URL から公開ページの本文を取り出す Worker (documents/adr/0004-url-import-through-cloudflare-worker.md)
+name = "sokudoku-extract"
+main = "src/index.ts"
+# fetch の cache: "no-store" (取得したページを Cloudflare のキャッシュに残さない) には 2024-11-11 以降の日付が要る
+compatibility_date = "2025-09-01"
+# https://sokudoku-extract.<account の workers.dev サブドメイン>.workers.dev で配信する
+workers_dev = true
+
+# 取得した URL・本文を Worker の外に残さないため、Workers Logs (invocation のログを含む) を使わない
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+# 同じ IP から 1 分あたり 30 回まで。period は 10 か 60 だけを指定できる
+[[ratelimits]]
+name = "EXTRACT_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60

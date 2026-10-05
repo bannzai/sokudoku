@@ -14,7 +14,7 @@
 
 | 機能 | 内容 |
 | --- | --- |
-| 取り込み | テキストの貼り付けと、DRM の無いファイル (青空文庫の txt・プレーンテキスト・EPUB) の読み込み |
+| 取り込み | テキストの貼り付けと、DRM の無いファイル (青空文庫の txt・プレーンテキスト・EPUB) の読み込みと、公開ページの URL からの本文の取り出し |
 | 日本語の分割 | 文節に区切る。句読点で間をとる |
 | 英語の分割 | 1 単語ずつ |
 | 表示 | 1 文節 (単語) ずつ、画面の同じ位置に中央揃えで表示する |
@@ -33,6 +33,7 @@
 - Web アプリ。Next.js の静的書き出しを GitHub Pages (https://bannzai.github.io/sokudoku/) で配信する。本文はブラウザ内だけで処理し、サーバーに送らず保存もしない (`documents/adr/0001-static-export-on-github-pages.md`)
 - DB・認証・課金は持たない (MVP)。特定商取引法に基づく表記は課金を入れる時に用意する
 - アクセス解析は Cloudflare Web Analytics (Cookie を使わない beacon)。読込テキストは送らない
+- URL からの取り込みだけは、公開ページの取得と本文の抽出を行う Cloudflare Worker (`worker/`) を通す (`documents/adr/0004-url-import-through-cloudflare-worker.md`)。Worker の URL は `https://sokudoku-extract.<account の workers.dev サブドメイン>.workers.dev` で、`wrangler deploy` (`deploy-worker.yml`) の出力に出る。フロントには repository variable `NEXT_PUBLIC_EXTRACT_URL` で渡し、未設定のビルドでは URL の入口を出さない
 
 ## 公開前に残すこと
 
