@@ -1,5 +1,6 @@
 import { isAozoraBunkoText, stripAozoraBunkoNotation } from "./aozoraBunko";
 import { extractEpubText } from "./epub";
+import type { ParagraphBoundaries } from "./readingUnits";
 
 /** 本文を取り込めなかった理由。URL からの取り込みの理由 (invalid-url 以降) は network を除き Worker の ExtractError (worker/src/index.ts) と同じ値 */
 export type ImportFailureReason =
@@ -19,8 +20,13 @@ export type ImportFailureReason =
   | "rate-limited"
   | "network";
 
-/** 取り込みの結果。成功時の text がリーダー画面へ渡す本文 */
-export type ImportResult = { ok: true; text: string } | { ok: false; reason: ImportFailureReason };
+/**
+ * 取り込みの結果。成功時の text がリーダー画面へ渡す本文。
+ * paragraphBoundaries は URL からの取り込みで Worker が LLM に区切らせた、text の段落ごとの区切りの位置 (区切らせた段落が無ければ undefined)
+ */
+export type ImportResult =
+  | { ok: true; text: string; paragraphBoundaries?: ParagraphBoundaries }
+  | { ok: false; reason: ImportFailureReason };
 
 /** 取り込めなかった理由ごとの、利用者に見せる文言 */
 export const importFailureMessages: Record<ImportFailureReason, string> = {

@@ -1,4 +1,5 @@
 import { type ImportFailureReason, type ImportResult, importPlainText } from "./importText";
+import { isParagraphBoundaries, type ParagraphBoundaries, paragraphMatches } from "./readingUnits";
 
 // Worker (worker/src/index.ts) が { error } で返す理由のうち、利用者に見せる文言があるもの
 const extractErrors = new Set<ImportFailureReason>([
@@ -11,12 +12,13 @@ const extractErrors = new Set<ImportFailureReason>([
   "rate-limited",
 ]);
 
-// Worker の呼び出しの時間の上限。Worker 自身の取得の上限 (10 秒、worker/src/index.ts) に、ブラウザと Worker の間の通信の余裕を足した値
-const extractTimeoutMilliseconds = 20_000;
+// Worker の呼び出しの時間の上限。Worker 自身の取得の上限 (10 秒、worker/src/index.ts) と LLM に区切らせる時間の上限
+// (10 秒、worker/src/segment.ts) に、ブラウザと Worker の間の通信の余裕を足した値
+const extractTimeoutMilliseconds = 30_000;
 
 /**
  * 入力された URL を、URL から本文を取り出す Worker (extractEndpoint は Worker のオリジン。NEXT_PUBLIC_EXTRACT_URL) に渡し、
- * 返ってきた本文を貼り付けと同じ経路で取り込む。title は本文の先頭の段落にする。
+ * 返ってきた本文を貼り付けと同じ経路で取り込む。title は本文の先頭の段落にする。Worker が LLM に区切らせた段落の区切りの位置は paragraphBoundaries に添える。
  * Worker に送るのはページの URL だけで、本文も読書位置も送らない。fetchExtract は Worker の呼び出しに使う (test で差し替える)
  */
 export async function importFromUrl(
@@ -70,7 +72,38 @@ export async function importFromUrl(
   // 本文の先頭の段落がタイトルの先頭と同じなら、見出しを 2 回読ませないようタイトルを重ねない
   const firstParagraph = body.text.trimStart().split("\n", 1)[0].trim();
   const titleRepeatsFirstParagraph = firstParagraph !== "" && title.startsWith(firstParagraph);
-  return importPlainText(title === "" || titleRepeatsFirstParagraph ? body.text : `${title}\n\n${body.text}`);
+  const importResult = importPlainText(title === "" || titleRepeatsFirstParagraph ? body.text : `${title}\n\n${body.text}`);
+  if (!importResult.ok) {
+    return importResult;
+  }
+  const paragraphBoundaries = alignParagraphBoundaries(importResult.text, body.text, body.units);
+  return paragraphBoundaries === undefined ? importResult : { ...importResult, paragraphBoundaries };
+}
+
+/**
+ * Worker が本文 (workerText を空行で区切った段落の順) に付けた区切りの位置 (units) を、取り込んだ本文 (importedText) の段落の順に並べ直す。
+ * タイトルを先頭に足す・前後の空白を除くなどで段落の位置が変わるため、段落の文字列が一致するものに対応させ、一致しない段落は null (BudouX で分ける) にする。
+ * 同じ文字列の段落は、Worker がどれか 1 つでも区切っていれば、すべてにその区切りを使う。
+ * units が無い・形が違う・段落の数が合わない・区切りのある段落が 1 つも無い時は undefined を返す
+ */
+function alignParagraphBoundaries(
+  importedText: string,
+  workerText: string,
+  units: unknown,
+): ParagraphBoundaries | undefined {
+  const workerParagraphs = workerText.split("\n\n");
+  if (!isParagraphBoundaries(units) || units.length !== workerParagraphs.length) {
+    return undefined;
+  }
+  // 同じ文字列の段落が複数ある時は、区切りのある方を残す。区切りの位置は段落の文字列だけで決まるため、同じ文字列の段落のどれにも使える
+  const boundariesByParagraph = new Map<string, readonly number[] | null>();
+  for (const [index, paragraph] of workerParagraphs.entries()) {
+    boundariesByParagraph.set(paragraph, boundariesByParagraph.get(paragraph) ?? units[index]);
+  }
+  const paragraphBoundaries = paragraphMatches(importedText).map(
+    (paragraph) => boundariesByParagraph.get(paragraph[0]) ?? null,
+  );
+  return paragraphBoundaries.some((boundaries) => boundaries !== null) ? paragraphBoundaries : undefined;
 }
 
 /** Worker の失敗のレスポンスの status と { error } から、利用者に見せる理由を決める */
@@ -84,8 +117,8 @@ function extractFailureReason(status: number, body: unknown): ImportFailureReaso
   return status === 429 ? "rate-limited" : "network";
 }
 
-/** Worker の成功のレスポンス ({ title, text, siteName?, lang? }) の形をしているかを返す */
-function isExtractedArticle(body: unknown): body is { title: string; text: string } {
+/** Worker の成功のレスポンス ({ title, text, units, siteName?, lang? }) の形をしているかを返す。units の形は alignParagraphBoundaries で確かめる */
+function isExtractedArticle(body: unknown): body is { title: string; text: string; units?: unknown } {
   return (
     typeof body === "object" &&
     body !== null &&

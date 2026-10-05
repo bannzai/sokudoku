@@ -59,6 +59,8 @@ agent が作ったモック (`documents/design/mock-2026-10-01/index.html`。方
 | 2026-10-05 | URL からの取り込み (#27・#28) | URL を貼ると本文を取り出して読めるようにし、取得と本文の抽出は Cloudflare Worker で行う (`documents/adr/0004-url-import-through-cloudflare-worker.md`) | bannzai |
 | 2026-10-05 | URL からの取り込み (#27・#28) | Worker は robots.txt が 5xx・接続の失敗のサイトと、5 MB を超える HTML・HTML でない応答を取得しない。失敗は理由の値 ({ error }) で返し、フロントが理由ごとの文言を出す。本文は段落ごとに空行で区切り、フロントはタイトルを先頭の段落にする (本文の先頭の段落がタイトルと同じなら重ねない)。URL の入口は貼り付け・ファイルの下に置く | agent |
 | 2026-10-05 | 文節分割の後処理 (#31) | BudouX の区切りの後に、ひらがなだけの短い単位と閉じ括弧・句読点で始まる単位を前に、閉じていない括弧を閉じ括弧まで後ろに結合する。品詞・付属語の表は持たず文字種と括弧の対応だけで判定する (`documents/adr/0003-japanese-bunsetsu-segmentation-with-budoux.md` に追記) | agent |
+| 2026-10-05 | LLM による区切り (#32) | LLM の提供元は Cloudflare Workers AI。本文を LLM に送るのは URL からの取り込みだけ (貼り付け・ファイルへ広げるかは、配信後の比較を見て別に決める) | bannzai |
+| 2026-10-05 | LLM による区切り (#32) | Worker が日本語の段落ごとに区切りの位置を返し、連結が元の段落と一致しない応答・段落数・文字数・時間の上限を超えた段落は BudouX に戻す。フロントは区切りの位置だけを本文の SHA-256 をキーに localStorage へ保存し、開き直した時は保存した区切りを使う。モデル (`worker/src/segment.ts`) は暫定で、配信後にニンニクの段落で比べて決め直す (`documents/adr/0005-llm-segmentation-for-url-import.md`) | agent |
 
 ## agent に任せること
 

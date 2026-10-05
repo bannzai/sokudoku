@@ -40,6 +40,13 @@ export type SegmentedText = {
   units: ReadingUnit[];
 };
 
+/**
+ * 段落ごとの区切りの位置。添字は paragraphMatches が返す段落の順と同じ。
+ * 各要素は、段落の中で新しい単位が始まる位置 (UTF-16 のインデックス、0 と段落の長さは含まない) で、
+ * URL からの取り込みで Worker が LLM に区切らせた結果 (worker/src/segment.ts)。null の段落は BudouX で分ける。
+ */
+export type ParagraphBoundaries = readonly (readonly number[] | null)[];
+
 const japaneseParser = new Parser(jaModel);
 
 // 仮名・漢字に加え、長音符「ー」や句読点「。、」も Script_Extensions では仮名・漢字に含まれる
@@ -84,23 +91,34 @@ function containsJapanese(text: string): boolean {
   return japaneseCharacterPattern.test(text);
 }
 
+/** 文字列を改行で区切った各行 (段落) を、元の文字列での位置 (index) 付きで先頭から返す。空の行は含めない。 */
+export function paragraphMatches(source: string): RegExpExecArray[] {
+  // U+2028・U+2029 も段落の区切りにする。japaneseSentencePattern の . がこれらに一致せず、前の本文を取りこぼすため
+  return [...source.matchAll(/[^\r\n\u2028\u2029]+/g)];
+}
+
 /**
  * 文字列を読む単位に分割し、各単位の元の文字列での位置・属する文・後にとる間を返す。
  *
  * 改行で区切った各行を段落とし、段落ごとに言語を判定する (仮名・漢字を含めば日本語、含まなければ英語)。
  * 日本語の段落は文末記号で文に分けてから BudouX で文節に分け、文節の中の空白でさらに分ける。
+ * paragraphBoundaries に区切りの位置がある日本語の段落は、BudouX と後処理の代わりにその位置で分ける (文末と空白では同じく分ける)。
  * 英語の段落は空白で単語に分け、句読点は前の単語に付いたままにする。
  */
-export function segmentText(source: string): SegmentedText {
+export function segmentText(source: string, paragraphBoundaries: ParagraphBoundaries = []): SegmentedText {
   const sentences: Sentence[] = [];
   const units: ReadingUnit[] = [];
-  // U+2028・U+2029 も段落の区切りにする。japaneseSentencePattern の . がこれらに一致せず、前の本文を取りこぼすため
-  for (const paragraph of source.matchAll(/[^\r\n\u2028\u2029]+/g)) {
+  for (const [paragraphIndex, paragraph] of paragraphMatches(source).entries()) {
     const paragraphStart = paragraph.index;
     const paragraphLanguage: Language = containsJapanese(paragraph[0]) ? "ja" : "en";
     const paragraphUnitCount = units.length;
+    const boundaries = paragraphLanguage === "ja" ? paragraphBoundaries[paragraphIndex] : undefined;
     for (const [sentenceStart, sentenceEnd] of sentenceRanges(paragraph[0], paragraphLanguage)) {
-      const sentenceUnits = wordRanges(paragraph[0].slice(sentenceStart, sentenceEnd), paragraphLanguage).map(
+      const sentenceUnits = wordRanges(
+        paragraph[0].slice(sentenceStart, sentenceEnd),
+        paragraphLanguage,
+        boundaries?.map((boundary) => boundary - sentenceStart),
+      ).map(
         ([wordStart, wordEnd]): ReadingUnit => {
           const start = paragraphStart + sentenceStart + wordStart;
           const text = source.slice(start, paragraphStart + sentenceStart + wordEnd);
@@ -160,17 +178,22 @@ function sentenceRanges(paragraph: string, language: Language): [number, number]
 
 /**
  * 文の中の各単位の範囲 ([開始, 終了) の文内の位置) を返す。空白だけの部分は単位にしない。
- * 日本語は BudouX の区切りを joinAttachedRanges でまとめ直した範囲を返す。
+ * 日本語は、givenBoundaries (文内の位置。文の外の位置は無視する) があればその区切りで分けた範囲を、
+ * 無ければ BudouX の区切りを joinAttachedRanges でまとめ直した範囲を返す。
  */
-function wordRanges(sentence: string, language: Language): [number, number][] {
+function wordRanges(sentence: string, language: Language, givenBoundaries?: readonly number[]): [number, number][] {
   const chunkBoundaries =
     language === "ja"
       ? [
           0,
           // サロゲートペアの間で区切ると文字が壊れるため、下位サロゲートの直前の境界は使わない
-          ...japaneseParser
-            .parseBoundaries(sentence)
-            .filter((boundary) => !isLowSurrogate(sentence.charCodeAt(boundary))),
+          ...(givenBoundaries ?? japaneseParser.parseBoundaries(sentence)).filter(
+            (boundary) =>
+              Number.isInteger(boundary) &&
+              boundary > 0 &&
+              boundary < sentence.length &&
+              !isLowSurrogate(sentence.charCodeAt(boundary)),
+          ),
           sentence.length,
         ]
       : [0, sentence.length];
@@ -180,7 +203,23 @@ function wordRanges(sentence: string, language: Language): [number, number][] {
       (word): [number, number] => [chunkStart + word.index, chunkStart + word.index + word[0].length],
     );
   });
-  return language === "ja" ? joinAttachedRanges(sentence, ranges) : ranges;
+  return language === "ja" && givenBoundaries === undefined ? joinAttachedRanges(sentence, ranges) : ranges;
+}
+
+/** 値が ParagraphBoundaries の形 (各要素が null か、1 以上の整数を狭義の昇順に並べた配列) かを返す。保存・受信した値を segmentText に渡す前に確かめる。 */
+export function isParagraphBoundaries(value: unknown): value is ParagraphBoundaries {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (boundaries) =>
+        boundaries === null ||
+        (Array.isArray(boundaries) &&
+          boundaries.every(
+            (boundary, index) =>
+              Number.isInteger(boundary) && boundary > (index === 0 ? 0 : boundaries[index - 1]),
+          )),
+    )
+  );
 }
 
 /**

@@ -6,14 +6,17 @@ import {
   type FinishedReading,
   hashText,
   localDateKey,
+  paragraphBoundariesForOpening,
   parseEnglishReadingDays,
   parseFinishedReadings,
   parseReadingPositions,
   parseReadingSpeed,
+  parseSavedParagraphBoundaries,
   type ReadingPosition,
   resumablePosition,
   summarizeEnglishReadingDays,
   summarizeFinishedReadings,
+  upsertParagraphBoundaries,
   upsertReadingPosition,
 } from "./readerStorage";
 
@@ -73,6 +76,49 @@ describe("読書位置", () => {
     expect(resumablePosition(readingPosition(3, 10, 0), 10)).toEqual(readingPosition(3, 10, 0));
     expect(resumablePosition(readingPosition(3, 10, 0), 11)).toBeUndefined();
     expect(resumablePosition(undefined, 10)).toBeUndefined();
+  });
+});
+
+describe("段落ごとの区切りの位置", () => {
+  it("形の合わない項目 (区切りが昇順でない・整数でない・保存時刻が無い) を捨てて読む", () => {
+    expect(
+      parseSavedParagraphBoundaries(
+        JSON.stringify({
+          good: { paragraphBoundaries: [null, [3, 8]], savedAt: 1 },
+          unsorted: { paragraphBoundaries: [[8, 3]], savedAt: 1 },
+          fraction: { paragraphBoundaries: [[1.5]], savedAt: 1 },
+          zero: { paragraphBoundaries: [[0, 3]], savedAt: 1 },
+          missingSavedAt: { paragraphBoundaries: [[3]] },
+          broken: null,
+        }),
+      ),
+    ).toEqual({ good: { paragraphBoundaries: [null, [3, 8]], savedAt: 1 } });
+    expect(parseSavedParagraphBoundaries("[]")).toEqual({});
+  });
+
+  it("書き込むと同じハッシュの区切りを上書きし、100 件を超えたら読みかけでない本文の保存が古いものから捨てる", () => {
+    const saved = Object.fromEntries(
+      Array.from({ length: 100 }, (_, index) => [`hash${index}`, { paragraphBoundaries: [[index + 1]], savedAt: index }]),
+    );
+    // 最も古い hash0 は読みかけのため残し、次に古い hash1 を捨てる
+    const updated = upsertParagraphBoundaries(saved, "new", [null, [2]], 1000, new Set(["hash0"]));
+    expect(Object.keys(updated)).toHaveLength(100);
+    expect(updated.new).toEqual({ paragraphBoundaries: [null, [2]], savedAt: 1000 });
+    expect(updated.hash0).toEqual({ paragraphBoundaries: [[1]], savedAt: 0 });
+    expect(updated.hash1).toBeUndefined();
+    expect(upsertParagraphBoundaries(updated, "new", [[4]], 1001, new Set()).new).toEqual({
+      paragraphBoundaries: [[4]],
+      savedAt: 1001,
+    });
+  });
+
+  it("開く時は保存した区切りを優先し、BudouX だけで読み始めた本文には受け取った区切りを使わない", () => {
+    const saved = [[3]];
+    const received = [[5]];
+    expect(paragraphBoundariesForOpening(saved, received, false)).toBe(saved);
+    expect(paragraphBoundariesForOpening(undefined, received, false)).toBe(received);
+    expect(paragraphBoundariesForOpening(undefined, received, true)).toBeUndefined();
+    expect(paragraphBoundariesForOpening(undefined, undefined, false)).toBeUndefined();
   });
 });
 

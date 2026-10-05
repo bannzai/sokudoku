@@ -1,5 +1,6 @@
 import type { ReadingSpeed } from "./displayDuration";
 import { type ReaderState, speedLimits } from "./readerState";
+import { isParagraphBoundaries, type ParagraphBoundaries } from "./readingUnits";
 
 /**
  * 本文ごとの読書位置と、そこまでの再生時間・読んだ量。本文そのものは保存せず、本文のハッシュをキーにする。
@@ -69,17 +70,37 @@ export type EnglishReadingDaysSummary = {
   days: { date: string; translationDisplayCount: number }[];
 };
 
+/**
+ * 本文のハッシュから、URL からの取り込みで Worker が LLM に区切らせた段落ごとの区切りの位置への対応。
+ * 同じ本文を開き直した時に同じ単位で読ませる (LLM の区切りは呼ぶたびに変わりうるため) のに使う。区切りの位置だけを持ち、本文の文字列は持たない。
+ */
+export type SavedParagraphBoundaries = Record<
+  string,
+  {
+    /** 本文の段落ごとの区切りの位置。 */
+    paragraphBoundaries: ParagraphBoundaries;
+    /** 保存した時刻 (エポックミリ秒)。保存数の上限を超えた時に古いものから捨てるのに使う。 */
+    savedAt: number;
+  }
+>;
+
 const storageKeys = {
   readingSpeed: "sokudoku:reading-speed",
   readingPositions: "sokudoku:reading-positions",
   finishedReadings: "sokudoku:finished-readings",
   englishReadingDays: "sokudoku:english-reading-days",
+  paragraphBoundaries: "sokudoku:paragraph-boundaries",
 };
 
 const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 
 // 読みかけの本文を同時に持つ数として十分な数。1 件は 100 バイトほどで、localStorage の容量 (5MB 前後) を圧迫しない
 const maxReadingPositionCount = 100;
+
+// 区切りの位置を残す本文の数。読書位置を残す本文 (最大 maxReadingPositionCount) の区切りをすべて残せる数にする。
+// 1 件は Worker が区切らせる文字数の上限 (20,000 文字、worker/src/segment.ts) でも 3,000 個ほどの位置の約 15KB で、
+// 100 件が上限の大きさでも localStorage の容量 (5MB 前後) の 3 割ほどに収まる
+const maxSavedParagraphBoundariesCount = maxReadingPositionCount;
 
 /** 値が 0 以上の整数かを返す。 */
 function isNonNegativeInteger(value: unknown): value is number {
@@ -165,6 +186,59 @@ export function parseEnglishReadingDays(json: string | null): EnglishReadingDays
       return dateKeyPattern.test(date) && typeof englishRead === "boolean" && isNonNegativeInteger(translationDisplayCount);
     }),
   ) as EnglishReadingDays;
+}
+
+/** 保存した段落ごとの区切りの位置の対応を読む。形の合わない項目は捨てる。 */
+export function parseSavedParagraphBoundaries(json: string | null): SavedParagraphBoundaries {
+  const value = parseJson(json);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([, saved]) => {
+      const { paragraphBoundaries, savedAt } = (saved ?? {}) as Record<string, unknown>;
+      return isParagraphBoundaries(paragraphBoundaries) && isNonNegativeInteger(savedAt);
+    }),
+  ) as SavedParagraphBoundaries;
+}
+
+/**
+ * 本文の段落ごとの区切りの位置を書き込んだ対応を返す。上限を超えたら、読みかけでない本文 (readingTextHashes に無く、書き込む本文でもない) の
+ * 保存が古いものから捨て、それでも超える時は読みかけの本文の保存が古いものから捨てる。
+ * 読みかけの本文の区切りを捨てると、開き直した時に単位が変わり読書位置が消える・ずれるため。
+ */
+export function upsertParagraphBoundaries(
+  saved: SavedParagraphBoundaries,
+  textHash: string,
+  paragraphBoundaries: ParagraphBoundaries,
+  savedAt: number,
+  readingTextHashes: ReadonlySet<string>,
+): SavedParagraphBoundaries {
+  const isKept = (entryTextHash: string) => entryTextHash === textHash || readingTextHashes.has(entryTextHash);
+  return Object.fromEntries(
+    Object.entries({ ...saved, [textHash]: { paragraphBoundaries, savedAt } })
+      .sort(
+        ([leftTextHash, left], [rightTextHash, right]) =>
+          Number(isKept(rightTextHash)) - Number(isKept(leftTextHash)) || right.savedAt - left.savedAt,
+      )
+      .slice(0, maxSavedParagraphBoundariesCount),
+  );
+}
+
+/**
+ * 本文を開く時に使う区切りの位置を返す。保存した区切り (saved) があればそれを、無ければ受け取った区切り (received) を返す。
+ * ただし区切りを保存せずに BudouX だけで読み始めた本文 (startedWithoutBoundaries) には undefined (BudouX で分ける) を返す。
+ * 受け取った区切りに切り替えると単位が変わり、単位の数で照合する読書位置が消える・ずれるため。
+ */
+export function paragraphBoundariesForOpening(
+  saved: ParagraphBoundaries | undefined,
+  received: ParagraphBoundaries | undefined,
+  startedWithoutBoundaries: boolean,
+): ParagraphBoundaries | undefined {
+  if (saved !== undefined) {
+    return saved;
+  }
+  return startedWithoutBoundaries ? undefined : received;
 }
 
 /** 指定した時刻の日を、英文を読んだ日にした記録を返す。その日の訳を出した回数は変えない。 */
@@ -322,6 +396,27 @@ export function saveReadingPosition(textHash: string, position: ReadingPosition)
     storageKeys.readingPositions,
     JSON.stringify(
       upsertReadingPosition(parseReadingPositions(readStorage(storageKeys.readingPositions)), textHash, position),
+    ),
+  );
+}
+
+/** 本文のハッシュから、保存した段落ごとの区切りの位置を読む。保存が無ければ undefined を返す。 */
+export function loadParagraphBoundaries(textHash: string): ParagraphBoundaries | undefined {
+  return parseSavedParagraphBoundaries(readStorage(storageKeys.paragraphBoundaries))[textHash]?.paragraphBoundaries;
+}
+
+/** 本文の段落ごとの区切りの位置を保存する。読書位置を保存している本文の区切りは、上限を超えても後回しに捨てる。 */
+export function saveParagraphBoundaries(textHash: string, paragraphBoundaries: ParagraphBoundaries, now: number) {
+  writeStorage(
+    storageKeys.paragraphBoundaries,
+    JSON.stringify(
+      upsertParagraphBoundaries(
+        parseSavedParagraphBoundaries(readStorage(storageKeys.paragraphBoundaries)),
+        textHash,
+        paragraphBoundaries,
+        now,
+        new Set(Object.keys(parseReadingPositions(readStorage(storageKeys.readingPositions)))),
+      ),
     ),
   );
 }
