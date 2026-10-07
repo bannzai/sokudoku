@@ -43,7 +43,9 @@ PORT ?= 3000
 .PHONY: web
 # 人が手で動作確認するための入口。サーバーが前面で動くため、ブラウザを開く処理は背面に置く。
 # 固定時間の待機だと起動の遅い環境で待ち受け前に開いて接続エラーになるため、応答を確かめてから開く。
-# 上限の 60 秒は、next dev の初回起動が数秒で終わることへの十分な余裕で、超えたら起動失敗とみなして開かない
+# 上限の 60 秒は、next dev の初回起動が数秒で終わることへの十分な余裕で、超えたら起動失敗とみなして開かない。
+# 応答の確認は今回起動したサーバーのものである必要があるため、先にポートが空いていることを確かめ、使用中 (別の worktree のサーバー等) なら起動せずに失敗する
 web:
+	@if lsof -nP -iTCP:$(PORT) -sTCP:LISTEN >/dev/null; then echo "ポート $(PORT) は使用中です。PORT=<別のポート> make で指定してください" >&2; exit 1; fi
 	(for i in $$(seq 1 60); do curl -fs -o /dev/null http://localhost:$(PORT)/sokudoku/ && { open http://localhost:$(PORT)/sokudoku/; break; }; sleep 1; done) &
 	npm run dev -- -p $(PORT)
