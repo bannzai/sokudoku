@@ -36,8 +36,12 @@ check: lint build-web typecheck test typecheck-worker test-worker
 .PHONY: verify
 verify: check
 
+# ブラウザで開く URL とサーバーの待ち受けを一致させるため、ポートを -p で明示する (next dev は明示したポートが使用中なら別のポートへ逃げず失敗する)。
+# 既定の 3000 は next dev の既定ポートで、dev の案内 (AGENTS.md) と Worker の CORS 許可元 (ADR 0004) が同じ値を前提にしている。PORT=3001 make で変えられる
+PORT ?= 3000
+
 .PHONY: web
 # dev と同じサーバーを起動し、basePath /sokudoku のトップをブラウザで開く。サーバーが前面で動くため、ブラウザは背面で少し待ってから開く
 web:
-	(sleep 2 && open http://localhost:3000/sokudoku/) &
-	npm run dev
+	(sleep 2 && open http://localhost:$(PORT)/sokudoku/) &
+	npm run dev -- -p $(PORT)
