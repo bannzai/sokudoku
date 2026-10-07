@@ -41,7 +41,9 @@ verify: check
 PORT ?= 3000
 
 .PHONY: web
-# dev と同じサーバーを起動し、basePath /sokudoku のトップをブラウザで開く。サーバーが前面で動くため、ブラウザは背面で少し待ってから開く
+# 人が手で動作確認するための入口。サーバーが前面で動くため、ブラウザを開く処理は背面に置く。
+# 固定時間の待機だと起動の遅い環境で待ち受け前に開いて接続エラーになるため、応答を確かめてから開く。
+# 上限の 60 秒は、next dev の初回起動が数秒で終わることへの十分な余裕で、超えたら起動失敗とみなして開かない
 web:
-	(sleep 2 && open http://localhost:$(PORT)/sokudoku/) &
+	(for i in $$(seq 1 60); do curl -fs -o /dev/null http://localhost:$(PORT)/sokudoku/ && { open http://localhost:$(PORT)/sokudoku/; break; }; sleep 1; done) &
 	npm run dev -- -p $(PORT)
