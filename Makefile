@@ -30,8 +30,14 @@ test-worker:
 
 check: lint build-web typecheck test typecheck-worker test-worker
 
-# 引数なしの make で動作確認 (verify) を実行する
-.DEFAULT_GOAL := verify
+# 引数なしの make で web を実行する (人が手で動作確認するための入口。検査・テストは CI が行う)
+.DEFAULT_GOAL := web
 
 .PHONY: verify
 verify: check
+
+.PHONY: web
+# dev と同じサーバーを起動し、basePath /sokudoku のトップをブラウザで開く。サーバーが前面で動くため、ブラウザは背面で少し待ってから開く
+web:
+	(sleep 2 && open http://localhost:3000/sokudoku/) &
+	npm run dev

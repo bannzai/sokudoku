@@ -24,7 +24,7 @@ main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ
 | 公開後の確認 | https://bannzai.github.io/sokudoku/ を webtunnel のセッションで開く |
 | 公開後の利用状況の分析 | `/cloudflare-web-analytics-report` (設定は `.claude/cloudflare-web-analytics.json`) で Cloudflare Web Analytics の日別の訪問数・人気ページを読む |
 
-`make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `typecheck-worker`・`test-worker` (`worker/` の Worker) / `check` (lint・typecheck・test・build-web・typecheck-worker・test-worker) / `verify` (`check` と同じ。引数なしの `make` で実行される)
+`make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `web` (`dev` と同じサーバーを起動し、http://localhost:3000/sokudoku/ をブラウザで開く。引数なしの `make` で実行される。人が手で動作確認するための入口で、検査・テストは含めず CI が行う) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `typecheck-worker`・`test-worker` (`worker/` の Worker) / `check` (lint・typecheck・test・build-web・typecheck-worker・test-worker) / `verify` (`check` と同じ)
 
 `worker/` の Worker は `wrangler dev` をローカルで起動せず、vitest の単体テストと、main へのマージで `deploy-worker.yml` が行う配信で確かめる。
 
