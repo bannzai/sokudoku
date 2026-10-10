@@ -111,12 +111,32 @@ describe("advance と読了", () => {
     expect(finished.readAmount.japaneseCharacters).toBe(16);
   });
 
-  it("読了後は再生・移動・速度変更を受け付けない", () => {
+  it("読了後に再生すると、読んだ量と再生時間を捨てて先頭から読み直す", () => {
     const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 0);
-    expect(play(finished, 5000)).toBe(finished);
-    expect(moveByUnits(finished, -1)).toBe(finished);
-    expect(moveBySentence(finished, "previous")).toBe(finished);
-    expect(stepSpeed(finished, ["ja"], 1)).toBe(finished);
+    expect(play(finished, 5000)).toEqual(play(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 5000));
+  });
+
+  it("読了後に移動すると、読んだ量と再生時間を捨てた停止中の状態で移った先から読み直す", () => {
+    const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 0);
+    expect(moveByUnits(finished, -1)).toEqual(createReaderState({ units: japaneseUnits, unitIndex: 2, speed }));
+    expect(moveBySentence(finished, "previous")).toEqual(createReaderState({ units: japaneseUnits, unitIndex: 2, speed }));
+    expect(playFrom(finished, 1, 5000)).toEqual(
+      play(createReaderState({ units: japaneseUnits, unitIndex: 1, speed }), 5000),
+    );
+  });
+
+  it("読了後に移る先が最後の単位のままなら読了のままにし、全文で最後の単位を選んだ時はそこから読み直す", () => {
+    const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 0);
+    expect(moveByUnits(finished, 1)).toBe(finished);
+    expect(moveBySentence(finished, "next")).toBe(finished);
+    expect(playFrom(finished, 3, 5000)).toEqual(
+      play(createReaderState({ units: japaneseUnits, unitIndex: 3, speed }), 5000),
+    );
+  });
+
+  it("読了後も速度を変えられ、読了のままにする", () => {
+    const finished = playToEnd(createReaderState({ units: japaneseUnits, unitIndex: 0, speed }), 0);
+    expect(stepSpeed(finished, ["ja"], 1)).toEqual({ ...finished, speed: { ...speed, japaneseCharactersPerMinute: 650 } });
   });
 
   it("restart は先頭の停止中に戻し、読んだ量と再生時間を捨てて速度は残す", () => {
