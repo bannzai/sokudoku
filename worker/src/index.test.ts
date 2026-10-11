@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { articleHtml, articleParagraphs } from "./__fixtures__/articlePage";
-import { decodeHtml, type Env, handleRequest } from "./index";
+import { decodeHtml, type Env, handleRequest, rateLimitKeyForIp } from "./index";
 
 /** URL ごとに返すレスポンスを決めた fetch の代わり。呼ばれた URL と init を記録する */
 function fakeFetch(routes: Record<string, () => Response>) {
@@ -14,15 +14,41 @@ function fakeFetch(routes: Record<string, () => Response>) {
 }
 
 /** 指定した回数まで通す Rate Limiting binding の代わり */
-function fakeEnv(allowedCount = Number.POSITIVE_INFINITY): Env {
+function fakeRateLimiter(allowedCount: number): Env["EXTRACT_RATE_LIMITER"] {
   let count = 0;
   return {
-    EXTRACT_RATE_LIMITER: {
-      limit: async () => {
-        count += 1;
-        return { success: count <= allowedCount };
-      },
+    limit: async () => {
+      count += 1;
+      return { success: count <= allowedCount };
     },
+  };
+}
+
+/**
+ * Rate Limiting binding (取り込みの回数 allowedCount・同じ IP の区切らせる回数 segmentAllowedCount・全体の区切らせる回数
+ * segmentGlobalAllowedCount まで通す) と、Workers AI の binding の代わり。
+ * 回数は、回数の制限を確かめない test が制限に当たらないよう既定では無制限にする。
+ * Workers AI は、区切りを確かめない test が LLM の応答に左右されないよう既定では失敗させ (全段落を null にする経路)、runAi を渡すとその応答を返す
+ */
+function fakeEnv(
+  allowedCount = Number.POSITIVE_INFINITY,
+  runAi: Env["AI"]["run"] = async () => Promise.reject(new Error("AI unavailable")),
+  segmentAllowedCount = Number.POSITIVE_INFINITY,
+  segmentGlobalAllowedCount = Number.POSITIVE_INFINITY,
+): Env {
+  return {
+    EXTRACT_RATE_LIMITER: fakeRateLimiter(allowedCount),
+    SEGMENT_RATE_LIMITER: fakeRateLimiter(segmentAllowedCount),
+    SEGMENT_GLOBAL_RATE_LIMITER: fakeRateLimiter(segmentGlobalAllowedCount),
+    AI: { run: runAi },
+  };
+}
+
+/** 段落を受け取り、区切った単位の文字列の配列を { response: { units } } で返す Workers AI の代わり */
+function fakeAi(splitParagraph: (paragraph: string) => string[]): Env["AI"]["run"] {
+  return async (_model, inputs) => {
+    const paragraph = (inputs.messages as { role: string; content: string }[]).find(({ role }) => role === "user")?.content ?? "";
+    return { response: { units: splitParagraph(paragraph) } };
   };
 }
 
@@ -56,6 +82,98 @@ describe("handleRequest", () => {
     const body = await response.json();
     expect(body).toMatchObject({ title: "速読の方法 - サンプルの百科事典", siteName: "サンプルの百科事典", lang: "ja" });
     expect(body.text).toContain(articleParagraphs[1]);
+  });
+
+  it("本文の段落ごとに Workers AI に区切らせた位置を units で返す", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    // 読点・句点の後ろで区切る
+    const env = fakeEnv(Number.POSITIVE_INFINITY, fakeAi((paragraph) => paragraph.match(/[^、。]+[、。]?/g) ?? []));
+    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
+    const paragraphs: string[] = body.text.split("\n\n");
+    expect(body.units).toHaveLength(paragraphs.length);
+    // 「速読とは、/ 文章を通常よりも速い速度で読み、/ 内容を理解する技術の総称である。/ 古くから様々な方法が提案されてきた。」
+    expect(body.units[paragraphs.indexOf(articleParagraphs[0])]).toEqual([5, 21, 37]);
+  });
+
+  it("区切りを連結した文字列が元の段落と一致しない応答 (本文の改変・脱落) は捨てて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    // 読点・句点の後ろで区切り、「文章」を言い換える。articleParagraphs[0] は「文章を…」を含むため改変される
+    const env = fakeEnv(
+      Number.POSITIVE_INFINITY,
+      fakeAi((paragraph) => (paragraph.match(/[^、。]+[、。]?/g) ?? []).map((unit) => unit.replace("文章", "ぶんしょう"))),
+    );
+    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
+    expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[0])]).toBeNull();
+    // 「文章」の無い段落は連結すると一致するため、区切りを返す (「一方で、/ 読む速度を…知られている。/ 自分に合った速度を選び、/ 必要なら…」)
+    expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[2])]).toEqual([4, 32, 44]);
+  });
+
+  it.each([
+    ["同じ IP の区切らせる回数", { segmentAllowedCount: 0, segmentGlobalAllowedCount: Number.POSITIVE_INFINITY }],
+    ["全体の区切らせる回数", { segmentAllowedCount: Number.POSITIVE_INFINITY, segmentGlobalAllowedCount: 0 }],
+  ])("%sが上限を超えたら、Workers AI を呼ばずに本文を返し、units をすべて null にする", async (_, counts) => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const runAi = vi.fn(fakeAi((paragraph) => [paragraph]));
+    const env = fakeEnv(Number.POSITIVE_INFINITY, runAi, counts.segmentAllowedCount, counts.segmentGlobalAllowedCount);
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
+    expect(runAi).not.toHaveBeenCalled();
+  });
+
+  it("区切らせる段落が無い記事 (英語だけ) では、区切らせる回数を数えない", async () => {
+    const englishParagraph =
+      "Rapid serial visual presentation shows words one at a time in the same position, so the reader does not move the eyes across the page.";
+    const englishHtml = `<!doctype html><html lang="en"><head><title>RSVP</title></head><body><article><h1>RSVP</h1>${Array.from(
+      { length: 6 },
+      () => `<p>${englishParagraph}</p>`,
+    ).join("")}</article></body></html>`;
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/english": () => htmlResponse(englishHtml),
+    });
+    const segmentLimit = vi.fn(async () => ({ success: true }));
+    const env: Env = { ...fakeEnv(), SEGMENT_RATE_LIMITER: { limit: segmentLimit }, SEGMENT_GLOBAL_RATE_LIMITER: { limit: segmentLimit } };
+    const response = await handleRequest(extractRequest("https://example.com/english"), env, fetchPage);
+    expect(response.status).toBe(200);
+    expect((await response.json()).text).toContain(englishParagraph);
+    expect(segmentLimit).not.toHaveBeenCalled();
+  });
+
+  it("区切らせる回数の Rate Limiting binding が失敗しても、本文を返し units をすべて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const env: Env = {
+      ...fakeEnv(),
+      SEGMENT_RATE_LIMITER: { limit: async () => Promise.reject(new Error("rate limiter unavailable")) },
+    };
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
+  });
+
+  it("Workers AI が失敗しても本文を返し、units をすべて null にする", async () => {
+    const fetchPage = fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
 
   it("取得には User-Agent で名乗り、キャッシュを使わず、リダイレクトを自分で追う", async () => {
@@ -250,6 +368,21 @@ describe("handleRequest", () => {
     expect(notFound.status).toBe(404);
     const post = await handleRequest(extractRequest("https://example.com/", { method: "POST" }), fakeEnv(), fakeFetch({}));
     expect(post.status).toBe(405);
+  });
+});
+
+describe("rateLimitKeyForIp", () => {
+  it("IPv6 は下位 64 bit が違っても同じ /64 の key にする", () => {
+    expect(rateLimitKeyForIp("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitKeyForIp("2001:0db8:0001:0002:ffff:ffff:ffff:ffff")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitKeyForIp("2001:db8::1")).toBe("2001:db8:0:0::/64");
+  });
+
+  it("IPv4・IPv4 を埋め込んだ IPv6・IP が無い時・読めない値は、そのまま (無ければ unknown) にする", () => {
+    expect(rateLimitKeyForIp("203.0.113.1")).toBe("203.0.113.1");
+    expect(rateLimitKeyForIp("::ffff:203.0.113.1")).toBe("::ffff:203.0.113.1");
+    expect(rateLimitKeyForIp(null)).toBe("unknown");
+    expect(rateLimitKeyForIp("not:an:ip")).toBe("not:an:ip");
   });
 });
 

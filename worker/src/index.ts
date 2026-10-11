@@ -1,12 +1,22 @@
 import { extractArticle } from "./extract";
 import { isAllowedByRobots } from "./robots";
+import { type Ai, segmentationTargets, segmentParagraphs } from "./segment";
 import { checkTargetUrl } from "./targetUrl";
 
 /** Workers の Rate Limiting binding のうち、この Worker が使う API */
 type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
 /** wrangler.toml で Worker に結び付ける binding */
-export type Env = { EXTRACT_RATE_LIMITER: RateLimit };
+export type Env = {
+  /** 同じ IP からの取り込みの回数の制限 */
+  EXTRACT_RATE_LIMITER: RateLimit;
+  /** 同じ IP から Workers AI に区切らせる記事の回数の制限 */
+  SEGMENT_RATE_LIMITER: RateLimit;
+  /** 全体で Workers AI に区切らせる記事の回数の制限 */
+  SEGMENT_GLOBAL_RATE_LIMITER: RateLimit;
+  /** 本文の段落を区切らせる Workers AI */
+  AI: Ai;
+};
 
 /**
  * 失敗の理由。フロント (src/lib/importText.ts の ImportFailureReason) がこの値で利用者に見せる文言を選ぶ。
@@ -73,8 +83,9 @@ const worker = {
 export default worker;
 
 /**
- * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
- * 取得した URL・本文はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)
+ * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, units, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
+ * units は text を空行で区切った段落ごとの、Workers AI に区切らせた位置 (ParagraphBoundaries。documents/adr/0005-llm-segmentation-for-url-import.md)。
+ * 取得した URL・本文・LLM の応答はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)
  */
 export async function handleRequest(request: Request, env: Env, fetchPage: typeof fetch): Promise<Response> {
   const origin = request.headers.get("Origin");
@@ -92,7 +103,8 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
     return errorResponse("method-not-allowed", origin);
   }
   // 回数を数えるためだけに IP を使い、記録はしない
-  const { success } = await env.EXTRACT_RATE_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") ?? "unknown" });
+  const rateLimitKey = rateLimitKeyForIp(request.headers.get("CF-Connecting-IP"));
+  const { success } = await env.EXTRACT_RATE_LIMITER.limit({ key: rateLimitKey });
   if (!success) {
     return errorResponse("rate-limited", origin);
   }
@@ -113,11 +125,62 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
     if (!article) {
       return errorResponse("unextractable", origin);
     }
-    return new Response(JSON.stringify(article), { status: 200, headers: responseHeaders(origin) });
+    const paragraphs = article.text.split("\n\n");
+    // 区切らせる段落が無い記事 (英語だけ等) は回数を数えない。区切らせる記事の回数の上限を超えたら、
+    // 本文の取り込みは失敗にせず、全段落を null (フロントが BudouX で分ける) にする
+    const units = segmentationTargets(paragraphs).some(Boolean) && (await canSegment(env, rateLimitKey))
+      ? await segmentParagraphs(env.AI, paragraphs)
+      : paragraphs.map(() => null);
+    return new Response(JSON.stringify({ ...article, units }), { status: 200, headers: responseHeaders(origin) });
   } catch (error) {
     // タイムアウト・接続の失敗は、利用者から見るとページを取得できなかったことと同じため page-unavailable にまとめる
     return errorResponse(error instanceof ExtractFailure ? error.extractError : "page-unavailable", origin);
   }
+}
+
+/**
+ * 記事を Workers AI に区切らせてよいかを、同じ IP (rateLimitKey) の回数と全体の回数の両方の上限から返す。
+ * Rate Limiting binding が失敗した時も、本文の取り込みを失敗にしないため false (区切らせない) を返す
+ */
+async function canSegment(env: Env, rateLimitKey: string): Promise<boolean> {
+  try {
+    return (
+      (await env.SEGMENT_RATE_LIMITER.limit({ key: rateLimitKey })).success &&
+      // 全体の回数は 1 つの key で数える。IP を変えて回数の制限をすり抜ける呼び出しでも、Workers AI の回数・費用をこの上限で抑える
+      (await env.SEGMENT_GLOBAL_RATE_LIMITER.limit({ key: "global" })).success
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 回数の制限に使う key を返す。IPv4 はアドレスのまま、IPv6 は上位 64 bit (/64) にまとめる。
+ * IPv6 の利用者は /64 をまとめて割り当てられ、下位 64 bit を変えるだけで別の key になり回数の制限をすり抜けられるため。
+ * IP が無い・IPv6 として読めない時はそのまま (無ければ "unknown") 返す
+ */
+export function rateLimitKeyForIp(ip: string | null): string {
+  if (ip === null) {
+    return "unknown";
+  }
+  // IPv4 と、IPv4 を埋め込んだ IPv6 (::ffff:192.0.2.1) は、アドレスのまま数える
+  if (!ip.includes(":") || ip.includes(".")) {
+    return ip;
+  }
+  const [head, tail] = ip.split("::");
+  const headGroups = head === "" ? [] : head.split(":");
+  const tailGroups = tail === undefined || tail === "" ? [] : tail.split(":");
+  const groups =
+    tail === undefined
+      ? headGroups
+      : [...headGroups, ...Array<string>(8 - headGroups.length - tailGroups.length).fill("0"), ...tailGroups];
+  if (groups.length !== 8 || !groups.every((group) => /^[0-9a-f]{1,4}$/i.test(group))) {
+    return ip;
+  }
+  return `${groups
+    .slice(0, 4)
+    .map((group) => parseInt(group, 16).toString(16))
+    .join(":")}::/64`;
 }
 
 /**
