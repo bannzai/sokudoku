@@ -135,7 +135,7 @@ describe("今の文の訳が画面に出る状態か", () => {
     expect(isTranslationDisplayed(shown, { currentSentenceLanguage: "ja", finished: false })).toBe(false);
   });
 
-  it("読了画面・非表示・作っている間は出ない", () => {
+  it("読了後・非表示・作っている間は出ない", () => {
     expect(isTranslationDisplayed(shown, { currentSentenceLanguage: "en", finished: true })).toBe(false);
     expect(
       isTranslationDisplayed({ ...shown, visible: false }, { currentSentenceLanguage: "en", finished: false }),

@@ -15,7 +15,6 @@ import {
   readingSummary,
   remainingDurationsMs,
   remainingFraction,
-  restart,
   speedKeys,
   speedLimits,
   stepSpeed,
@@ -205,57 +204,56 @@ function FullText({ source, currentUnit, onSelectOffset }: FullTextProps) {
   );
 }
 
-/** 読了画面に渡す値。 */
-type FinishedScreenProps = {
+/** 読了の結果に渡す値。 */
+type FinishedSummaryProps = {
   /** 読了した時の再生の状態。 */
   readerState: ReaderState;
   /** 今回の読了を足した後の読了の記録。 */
   finishedReadings: readonly FinishedReading[];
   /** 英文を読んだ日ごとの、訳を出した回数。 */
   englishReadingDays: EnglishReadingDays;
-  /** 先頭から読み直す。 */
-  onRestart: () => void;
-  /** 取り込みの画面へ戻る。 */
-  onClose: () => void;
 };
 
 // 判定基準は週あたりの量のため、前の週と比べられる 2 週分を出す
 const displayedDayCount = 14;
 
-/** 読了画面。読んだ時間・量・実効速度と、読了の記録の集計を出す。内容の質問は出さない (ADR 0002)。 */
-function FinishedScreen({ readerState, finishedReadings, englishReadingDays, onRestart, onClose }: FinishedScreenProps) {
+/**
+ * 読了した時に再生の画面の中に出す結果。読んだ時間・量・実効速度と、読了の記録の集計を出す。内容の質問は出さない (ADR 0002)。
+ * 記録の表は判定日に確かめるためのもので、読み終えるたびに見るものではないため、開閉できる欄に入れる。
+ */
+function FinishedSummary({ readerState, finishedReadings, englishReadingDays }: FinishedSummaryProps) {
   const summary = readingSummary(readerState);
   const finishedReadingSummary = summarizeFinishedReadings(finishedReadings, readerState.finishedAt ?? 0);
   const englishReadingDaysSummary = summarizeEnglishReadingDays(englishReadingDays, readerState.finishedAt ?? 0);
   return (
-    <>
-      <AppBar linksToTop={false} />
-      <main className={styles.finished}>
-        <h1 className={styles.title}>読了</h1>
-        <dl className={styles.stats}>
+    <section className={styles.finished}>
+      <h2 className={styles.title}>読了</h2>
+      <dl className={styles.stats}>
+        <div className={styles.stat}>
+          <dt>読んだ時間</dt>
+          <dd>{formatPlayedTime(summary.playedMs)}</dd>
+        </div>
+        <div className={styles.stat}>
+          <dt>読んだ量</dt>
+          <dd>{formatReadAmount(summary)}</dd>
+        </div>
+        {summary.japaneseCharactersPerMinute !== undefined && (
           <div className={styles.stat}>
-            <dt>読んだ時間</dt>
-            <dd>{formatPlayedTime(summary.playedMs)}</dd>
+            <dt>実効速度 (日本語)</dt>
+            <dd>{formatNumber(summary.japaneseCharactersPerMinute)} 文字/分</dd>
           </div>
+        )}
+        {summary.englishWordsPerMinute !== undefined && (
           <div className={styles.stat}>
-            <dt>読んだ量</dt>
-            <dd>{formatReadAmount(summary)}</dd>
+            <dt>実効速度 (英語)</dt>
+            <dd>{formatNumber(summary.englishWordsPerMinute)} 語/分</dd>
           </div>
-          {summary.japaneseCharactersPerMinute !== undefined && (
-            <div className={styles.stat}>
-              <dt>実効速度 (日本語)</dt>
-              <dd>{formatNumber(summary.japaneseCharactersPerMinute)} 文字/分</dd>
-            </div>
-          )}
-          {summary.englishWordsPerMinute !== undefined && (
-            <div className={styles.stat}>
-              <dt>実効速度 (英語)</dt>
-              <dd>{formatNumber(summary.englishWordsPerMinute)} 語/分</dd>
-            </div>
-          )}
-        </dl>
+        )}
+      </dl>
+      <details className={styles.recordsDetails}>
+        <summary className={styles.heading}>これまでの記録</summary>
         <section className={styles.records}>
-          <h2 className={styles.heading}>読了の記録</h2>
+          <h3 className={styles.heading}>読了の記録</h3>
           <dl className={styles.summary}>
             <dt>直近 7 日</dt>
             <dd>{formatReadAmount(finishedReadingSummary.lastSevenDays)}</dd>
@@ -281,7 +279,7 @@ function FinishedScreen({ readerState, finishedReadings, englishReadingDays, onR
         </section>
         {englishReadingDaysSummary.days.length > 0 && (
           <section className={styles.records}>
-            <h2 className={styles.heading}>英文の訳の表示</h2>
+            <h3 className={styles.heading}>英文の訳の表示</h3>
             <dl className={styles.summary}>
               <dt>直近 7 日</dt>
               <dd>
@@ -307,21 +305,14 @@ function FinishedScreen({ readerState, finishedReadings, englishReadingDays, onR
             </table>
           </section>
         )}
-        <div className={styles.actions}>
-          <button type="button" className={`${buttonStyles.button} ${buttonStyles.primary}`} onClick={onRestart}>
-            最初から読む
-          </button>
-          <button type="button" className={buttonStyles.button} onClick={onClose}>
-            別の本文を読む
-          </button>
-        </div>
-      </main>
-    </>
+      </details>
+    </section>
   );
 }
 
 /**
  * 再生の画面。単位を 1 つずつ画面中央に中央揃えで出し、停止中だけ全文と現在位置のハイライトを出す。
+ * 読了しても別の画面へ切り替えず、最後の単位を出したまま止めて読了の結果を足す。取り込みの画面へ戻るボタンは再生中も出す。
  * 再生中に全文を出さない・単位の中の文字の見た目を変えない・表示のクリックは一時停止と再開だけに使う (ADR 0002)。
  */
 export function ReadingSession({
@@ -502,8 +493,11 @@ export function ReadingSession({
       if (event.ctrlKey || event.metaKey || event.altKey || !(event.target instanceof Element)) {
         return;
       }
-      // 入力欄のキー操作と、キーボードで選んだボタンの space での押下は、ブラウザの動作に任せる
-      if (event.target.closest("input, textarea, select") || (event.key === " " && event.target.closest("button"))) {
+      // 入力欄のキー操作と、キーボードで選んだボタン・記録の開閉欄の space での押下は、ブラウザの動作に任せる
+      if (
+        event.target.closest("input, textarea, select") ||
+        (event.key === " " && event.target.closest("button, summary"))
+      ) {
         return;
       }
       if (hasEnglishSentence && readerState.status !== "finished" && event.key.toLowerCase() === "t") {
@@ -532,33 +526,23 @@ export function ReadingSession({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [hasEnglishSentence, languages, readerState, toggleTranslationDisplay, translationState]);
 
-  if (readerState.status === "finished") {
-    return (
-      <FinishedScreen
-        readerState={readerState}
-        finishedReadings={finishedReadings}
-        englishReadingDays={englishReadingDays}
-        onRestart={() => setReaderState(restart(readerState))}
-        onClose={onClose}
-      />
-    );
-  }
-
   const currentUnit = units[readerState.unitIndex];
   const isPlaying = readerState.status === "playing";
-  const remaining = remainingFraction(units, readerState.unitIndex);
+  const isFinished = readerState.status === "finished";
+  // 読了は最後の単位を表示し終えた状態のため、最後の単位の分も読んだ位置に含める
+  const remaining = isFinished ? 0 : remainingFraction(units, readerState.unitIndex);
   const currentSentenceTranslation = sentenceTranslations[currentSentenceIndex];
   const notice = translatorNotice(translationState);
   return (
     <>
-      <AppBar description={isPlaying ? "再生中" : "一時停止中"} linksToTop={false} />
+      <AppBar description={isPlaying ? "再生中" : isFinished ? "読了" : "一時停止中"} linksToTop={false} />
       <main className={isPlaying ? `${styles.session} ${styles.playing}` : styles.session}>
         <button
           type="button"
           className={styles.display}
           onMouseDown={keepFocusOffButton}
           onClick={() => setReaderState(togglePlay(readerState, Date.now()))}
-          aria-label={isPlaying ? "一時停止" : "再開"}
+          aria-label={isPlaying ? "一時停止" : isFinished ? "最初から読む" : "再開"}
         >
           <span className={stageStyles.stage}>
             <span
@@ -621,10 +605,11 @@ export function ReadingSession({
               onMouseDown={keepFocusOffButton}
               onClick={() => setReaderState(togglePlay(readerState, Date.now()))}
             >
-              {isPlaying ? "一時停止" : "再生"} <kbd>space</kbd>
+              {isPlaying ? "一時停止" : isFinished ? "最初から読む" : "再生"} <kbd>space</kbd>
             </button>
             <span className={styles.readout}>
-              残り {Math.round(remaining * 100)}% ・ {formatRemainingTime(remainingDurations[readerState.unitIndex])}
+              残り {Math.round(remaining * 100)}%
+              {!isFinished && ` ・ ${formatRemainingTime(remainingDurations[readerState.unitIndex])}`}
             </span>
           </div>
           <div className={styles.controlsRow}>
@@ -669,7 +654,8 @@ export function ReadingSession({
                   className={buttonStyles.button}
                   onMouseDown={keepFocusOffButton}
                   onClick={toggleTranslationDisplay}
-                  disabled={!canToggleTranslation(translationState)}
+                  // 読了後は訳を出さない (T キーも同じ) ため、押せないようにする
+                  disabled={isFinished || !canToggleTranslation(translationState)}
                   aria-pressed={translationState.visible}
                 >
                   {translationState.visible ? "訳を隠す" : "訳を出す"} <kbd>T</kbd>
@@ -677,13 +663,25 @@ export function ReadingSession({
                 {notice !== undefined && <span className={styles.note}>{notice}</span>}
               </div>
             )}
+            <button type="button" className={buttonStyles.button} onMouseDown={keepFocusOffButton} onClick={onClose}>
+              別の本文を読む
+            </button>
           </div>
         </div>
+        {isFinished && (
+          <FinishedSummary
+            readerState={readerState}
+            finishedReadings={finishedReadings}
+            englishReadingDays={englishReadingDays}
+          />
+        )}
         {!isPlaying && (
           <section className={styles.fullTextSection}>
             <div className={styles.fullTextHeader}>
               <h2 className={styles.heading}>全文</h2>
-              <p className={styles.note}>クリックした位置から再開します</p>
+              <p className={styles.note}>
+                {isFinished ? "クリックした位置から読み直します" : "クリックした位置から再開します"}
+              </p>
             </div>
             <FullText
               source={source}
@@ -692,11 +690,6 @@ export function ReadingSession({
                 setReaderState(playFrom(readerState, unitIndexAtOffset(units, offset), Date.now()))
               }
             />
-            <div>
-              <button type="button" className={buttonStyles.button} onClick={onClose}>
-                別の本文を読む
-              </button>
-            </div>
           </section>
         )}
       </main>
