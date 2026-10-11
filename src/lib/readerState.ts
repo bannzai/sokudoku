@@ -1,10 +1,10 @@
 import { displayDurationMs, japaneseCharacterCount, type ReadingSpeed } from "./displayDuration";
 import type { Language, ReadingUnit } from "./readingUnits";
 
-/** 再生の状態。読了は最後の単位を表示し終えた状態で、再生・移動・速度変更を受け付けない。 */
+/** 再生の状態。読了は最後の単位を表示し終えた状態で、再生・移動すると先頭からの読み直しとして始める。 */
 export type ReaderStatus = "paused" | "playing" | "finished";
 
-/** 表示し終えた単位の量。読了画面の文字数・単語数と実効速度の計算に使う。 */
+/** 表示し終えた単位の量。読了の表示の文字数・単語数と実効速度の計算に使う。 */
 export type ReadAmount = {
   /** 表示し終えた日本語の単位の文字数の合計 (japaneseCharacterCount の数え方)。 */
   japaneseCharacters: number;
@@ -101,8 +101,11 @@ export function playedMsAt(state: ReaderState, now: number): number {
   return state.playedMs + (state.playingSince === undefined ? 0 : now - state.playingSince);
 }
 
-/** 現在位置から再生を始める。再生中・読了後・単位が無い時は何もしない。 */
+/** 現在位置から再生を始める。読了後は先頭から読み直す。再生中・単位が無い時は何もしない。 */
 export function play(state: ReaderState, now: number): ReaderState {
+  if (state.status === "finished") {
+    return play(restart(state), now);
+  }
   if (state.status !== "paused" || state.units.length === 0) {
     return state;
   }
@@ -162,12 +165,17 @@ export function advance(state: ReaderState, now: number): ReaderState {
   return { ...state, unitIndex: state.unitIndex + 1, readAmount };
 }
 
-/** 指定した単位へ移る。範囲外は先頭・末尾に収める。再生中は再生したまま移る。読了後は何もしない。 */
+/**
+ * 指定した単位へ移る。範囲外は先頭・末尾に収める。再生中は再生したまま移る。
+ * 読了後は、読んだ量と再生した時間を捨てた停止中の状態で移り、移った先からの読み直しにする (前の読了は記録済みのため)。
+ * 読了後に移る先が今の単位 (最後の単位) のままなら、読了の表示を消さないよう何もしない。
+ */
 function moveTo(state: ReaderState, unitIndex: number): ReaderState {
-  if (state.status === "finished") {
-    return state;
+  const destinationUnitIndex = clamp(unitIndex, 0, state.units.length - 1);
+  if (state.status !== "finished") {
+    return { ...state, unitIndex: destinationUnitIndex };
   }
-  return { ...state, unitIndex: clamp(unitIndex, 0, state.units.length - 1) };
+  return destinationUnitIndex === state.unitIndex ? state : { ...restart(state), unitIndex: destinationUnitIndex };
 }
 
 /** 単位の数だけ前後へ移る (負の数で前へ)。 */
@@ -190,7 +198,7 @@ function sentenceFirstUnitIndex(units: readonly ReadingUnit[], unitIndex: number
  * 後ろに文が無ければ移らない。
  */
 export function moveBySentence(state: ReaderState, direction: "previous" | "next"): ReaderState {
-  if (state.status === "finished" || state.units.length === 0) {
+  if (state.units.length === 0) {
     return state;
   }
   const currentSentenceFirstUnitIndex = sentenceFirstUnitIndex(state.units, state.unitIndex);
@@ -210,14 +218,15 @@ export function moveBySentence(state: ReaderState, direction: "previous" | "next
 
 /** 停止中の全文で選んだ単位から再生を始める。 */
 export function playFrom(state: ReaderState, unitIndex: number, now: number): ReaderState {
-  return play(moveTo(state, unitIndex), now);
+  // 読了後に最後の単位を選んだ時も、先頭からではなく選んだ単位から読み直すため、先に読了を解く
+  return play(moveTo(state.status === "finished" ? restart(state) : state, unitIndex), now);
 }
 
-/** 指定した言語の速度を、幅 (speedLimits の step) の倍数だけ上げ下げする (負の数で下げる)。範囲外は上限・下限に収める。 */
+/**
+ * 指定した言語の速度を、幅 (speedLimits の step) の倍数だけ上げ下げする (負の数で下げる)。範囲外は上限・下限に収める。
+ * 読了後も変えられ、読了のまま次の読み直しの速度にする。
+ */
 export function stepSpeed(state: ReaderState, languages: readonly Language[], stepDelta: number): ReaderState {
-  if (state.status === "finished") {
-    return state;
-  }
   const speed = { ...state.speed };
   for (const language of languages) {
     const speedKey = speedKeys[language];
@@ -282,7 +291,7 @@ export function remainingFraction(units: readonly ReadingUnit[], unitIndex: numb
   return (textEnd - units[unitIndex].start) / (textEnd - units[0].start);
 }
 
-/** 読了画面に出す、読んだ量と実効速度。 */
+/** 読了した時に出す、読んだ量と実効速度。 */
 export type ReadingSummary = {
   /** 再生していた時間 (ミリ秒)。停止中の時間は含めない。 */
   playedMs: number;

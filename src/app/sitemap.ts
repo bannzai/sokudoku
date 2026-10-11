@@ -6,5 +6,5 @@ export const dynamic = "force-static";
 
 /** 検索エンジンに知らせるページの一覧 */
 export default function sitemap(): MetadataRoute.Sitemap {
-  return ["", "read/", "terms/", "privacy/"].map((path) => ({ url: new URL(path, siteUrl).href }));
+  return ["", "about/", "terms/", "privacy/"].map((path) => ({ url: new URL(path, siteUrl).href }));
 }
