@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SokudokuCore
+import UIKit
 
 /// 1 つの本文を読む間のリーダーの状態 (区切った単位・現在の位置・再生中か・速度)。SwiftUI の画面が変更を観測するため class にする。
 @MainActor
@@ -8,6 +9,8 @@ import SokudokuCore
 final class ReaderModel {
     /// 読んでいる本文。端末の外へ送らず、保存もしない。
     let source: String
+    /// 読書位置を保存するキー (本文の SHA-256)。本文は変わらないため、単位が進むたびに全文をハッシュしないよう一度だけ計算する。
+    private let sourceKey: String
     /// 本文を区切った結果。区切り終わるまでは nil。
     private(set) var segmented: SegmentedText?
     /// 区切りに失敗した時の理由 (MeCab の辞書を開けない等)。
@@ -25,6 +28,7 @@ final class ReaderModel {
 
     init(source: String) {
         self.source = source
+        self.sourceKey = textKey(source)
         self.speed = loadSpeed()
         Task { await segment() }
     }
@@ -42,7 +46,7 @@ final class ReaderModel {
     private var remainingDurationsByIndex: [TimeInterval] = [0]
 
     var remainingSeconds: TimeInterval {
-        remainingDurationsByIndex.indices.contains(index) ? remainingDurationsByIndex[index] : 0
+        !isFinished && remainingDurationsByIndex.indices.contains(index) ? remainingDurationsByIndex[index] : 0
     }
 
     var isAtEnd: Bool { !units.isEmpty && index == units.count - 1 }
@@ -59,6 +63,8 @@ final class ReaderModel {
             move(to: 0)
         }
         isPlaying = true
+        // RSVP の表示の更新は操作として扱われず、自動ロックで画面が消えると再生も止まるため、再生中だけ自動ロックを止める
+        UIApplication.shared.isIdleTimerDisabled = true
         playback = Task { [weak self] in
             await self?.runPlayback()
         }
@@ -66,6 +72,7 @@ final class ReaderModel {
 
     func pause() {
         isPlaying = false
+        UIApplication.shared.isIdleTimerDisabled = false
         playback?.cancel()
         playback = nil
     }
@@ -91,7 +98,7 @@ final class ReaderModel {
             }.value
             segmented = result
             remainingDurationsByIndex = remainingDurations(units: result.units, speed: speed)
-            index = resumableIndex(savedIndex: loadPosition(key: textKey(source)), unitCount: result.units.count)
+            index = resumableIndex(savedIndex: loadPosition(key: sourceKey), unitCount: result.units.count)
         } catch {
             failureMessage = "本文を区切れませんでした: \(error.localizedDescription)"
         }
@@ -119,7 +126,7 @@ final class ReaderModel {
         }
         index = min(max(newIndex, 0), units.count - 1)
         isFinished = false
-        savePosition(key: textKey(source), index: index)
+        savePosition(key: sourceKey, index: index)
     }
 }
 

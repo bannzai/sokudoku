@@ -138,6 +138,9 @@ struct ReaderView: View {
         guard !reader.units.isEmpty else {
             return ""
         }
+        if reader.isFinished {
+            return "読了・\(reader.units.count) / \(reader.units.count)"
+        }
         let remaining = Int(reader.remainingSeconds.rounded())
         return "\(reader.index + 1) / \(reader.units.count)・残り \(remaining / 60):\(String(format: "%02d", remaining % 60))"
     }
