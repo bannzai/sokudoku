@@ -9,6 +9,9 @@ struct ReaderView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// 単位を出す領域の高さ。40pt の明朝で 4 行ほど。停止中に出す前後の文の領域を iPhone の画面に残しつつ、ニンニクの記事の URL (40pt では 6 行) は縮めて収まる高さ (2026-10-18 にシミュレータの iPhone で確認)。
+    private let unitDisplayHeight: CGFloat = 200
+
     var body: some View {
         VStack(spacing: 0) {
             if let failureMessage = reader.failureMessage {
@@ -53,10 +56,13 @@ struct ReaderView: View {
             Rectangle().fill(Palette.guide).frame(width: 1, height: 28)
             Text(reader.currentUnit?.text ?? "")
                 .font(.custom("HiraMinProN-W3", size: 40, relativeTo: .largeTitle))
-                // 単位の文字数に上限が無く (長い URL・複合名詞)、1 行に縮めても収まらない単位は省略せず折り返して全文を出す
-                .fixedSize(horizontal: false, vertical: true)
+                // 単位の文字数に上限が無い (長い URL・複合名詞) ため、省略せず折り返し、収まらなければ縮めて全文を出す。
+                // 単位が変わっても同じ位置に出すよう、表示領域の高さは単位の長さによらず固定する
+                .lineLimit(6)
+                .minimumScaleFactor(0.25)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .frame(height: unitDisplayHeight)
                 .accessibilityIdentifier("currentUnit")
             Rectangle().fill(Palette.guide).frame(width: 1, height: 28)
         }
