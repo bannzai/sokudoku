@@ -1,3 +1,4 @@
+import SokudokuCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -48,7 +49,8 @@ struct ImportView: View {
             }
 
             Button {
-                open(text)
+                // 貼り付け・ファイルのどちらで入れた青空文庫の文章も、ルビ・入力者注・底本情報を除いてから読む
+                open(readableText(importedText: text))
             } label: {
                 Text("読む").frame(maxWidth: .infinity)
             }
