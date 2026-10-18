@@ -234,8 +234,9 @@ struct IPADicFeatureColumns: DictionaryProviding {
     }
 }
 
-/// 改行 (CR・LF・U+2028・U+2029) を含まない連続を 1 つの段落にする。
-private let paragraphPattern = try! NSRegularExpression(pattern: #"[^\r\n  ]+"#)
+/// 改行 (CR・LF・VT・FF・NEL・U+2028・U+2029) を含まない連続を 1 つの段落にする。
+/// 正規表現の `.` はこれらの改行に一致しないため、どれかが段落に残ると文の照合が失敗して前の本文が単位から消える
+private let paragraphPattern = try! NSRegularExpression(pattern: #"[^\r\n\x{000B}\x{000C}\x{0085}\x{2028}\x{2029}]+"#)
 
 /// 仮名・漢字。長音符「ー」や句読点「。、」も Script_Extensions では仮名・漢字に含まれる。
 private let japaneseCharacterPattern = try! NSRegularExpression(

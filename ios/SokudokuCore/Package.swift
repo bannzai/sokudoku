@@ -8,8 +8,9 @@ let package = Package(
         .library(name: "SokudokuCore", targets: ["SokudokuCore"]),
     ],
     dependencies: [
-        // 端末内の形態素解析 (MeCab) と IPADic の辞書。品詞から文節を組み立てるために使う (documents/adr/0006-ios-native-app-with-on-device-mecab.md)
-        .package(url: "https://github.com/shinjukunian/Mecab-Swift", from: "0.8.0"),
+        // 端末内の形態素解析 (MeCab) と IPADic の辞書。品詞から文節を組み立てるために使う (documents/adr/0006-ios-native-app-with-on-device-mecab.md)。
+        // 区切りは版によって変わり得るため、テストで区切りを確かめた版に固定する。上げる時は make test-ios で区切りを確かめてから変える
+        .package(url: "https://github.com/shinjukunian/Mecab-Swift", exact: "0.8.0"),
     ],
     targets: [
         .target(

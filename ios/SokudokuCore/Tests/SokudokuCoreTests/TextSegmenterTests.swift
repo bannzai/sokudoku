@@ -73,6 +73,15 @@ final class TextSegmenterTests: XCTestCase {
         assertOffsetsMatchSource("GitHub Pages で公開する。")
     }
 
+    func testEveryLineBreakSeparatesParagraphsWithoutDroppingText() {
+        for lineBreak in ["\u{000B}", "\u{000C}", "\u{0085}", "\u{2028}", "\u{2029}", "\r\n"] {
+            let source = "前半の文\(lineBreak)後半の文。"
+            let segmented = segmenter.segment(source)
+            XCTAssertEqual(segmented.units.map(\.text).joined(), "前半の文後半の文。", "改行 \(lineBreak.unicodeScalars.map { String($0.value, radix: 16) }) で本文が消えた")
+            XCTAssertEqual(segmented.sentences.count, 2)
+        }
+    }
+
     func testEmptyAndWhitespaceOnlyTextHasNoUnits() {
         XCTAssertEqual(segmenter.segment("").units, [])
         XCTAssertEqual(segmenter.segment(" \n　\n").units, [])
