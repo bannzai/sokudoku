@@ -16,6 +16,8 @@ final class ReaderModel {
     private(set) var index = 0
     /// 再生中か。停止中だけ全文と現在位置を出す (documents/adr/0002-avoid-patented-features-and-drm-import.md)。
     private(set) var isPlaying = false
+    /// 最後の単位を表示時間いっぱいまで出し終えたか。最後の単位に移動しただけ・その途中で止めただけでは立てない。読み終えた後の再生だけを先頭からの読み直しにするために使う。
+    private(set) var isFinished = false
     /// 読む速度。端末に保存し、次に開いた時も同じ速度で読む。
     private(set) var speed: ReadingSpeed
 
@@ -53,7 +55,7 @@ final class ReaderModel {
         guard !units.isEmpty else {
             return
         }
-        if isAtEnd {
+        if isFinished {
             move(to: 0)
         }
         isPlaying = true
@@ -104,6 +106,7 @@ final class ReaderModel {
             guard !isAtEnd else {
                 // 読み終えても読了画面へ切り替えず、最後の単位を出したまま止める (Web 版の PR #39 と同じ)
                 pause()
+                isFinished = true
                 return
             }
             move(to: index + 1)
@@ -115,6 +118,7 @@ final class ReaderModel {
             return
         }
         index = min(max(newIndex, 0), units.count - 1)
+        isFinished = false
         savePosition(key: textKey(source), index: index)
     }
 }
