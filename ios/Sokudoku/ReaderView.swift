@@ -7,6 +7,8 @@ struct ReaderView: View {
     /// 別の文章を読むために、取り込み画面へ戻る。
     let close: () -> Void
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         VStack(spacing: 0) {
             if let failureMessage = reader.failureMessage {
@@ -37,6 +39,12 @@ struct ReaderView: View {
             }
         }
         .onDisappear { reader.pause() }
+        // ホーム画面やコントロールセンターへ移っても画面は破棄されず onDisappear が呼ばれないため、見ていない間に再生が進まないよう止める
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                reader.pause()
+            }
+        }
     }
 
     /// 単位を出す位置。上下の細い縦線の間に、毎回同じ位置へ中央揃えで出す。タップで再生・一時停止する。

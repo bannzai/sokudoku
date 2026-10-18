@@ -7,14 +7,17 @@ final class ReadingProgressTests: XCTestCase {
         XCTAssertNotEqual(textKey("吾輩は猫である。"), textKey("吾輩は猫である"))
     }
 
-    func testRemainingDurationSumsFromIndex() {
+    func testRemainingDurationsAreSuffixSums() {
         let units = [
             ReadingUnit(text: "吾輩は", start: 0, end: 3, language: .ja, sentenceIndex: 0, pause: .none),
             ReadingUnit(text: "猫である。", start: 3, end: 8, language: .ja, sentenceIndex: 0, pause: .sentence),
         ]
-        XCTAssertEqual(remainingDuration(units: units, from: 0, speed: .default), 1.3, accuracy: 0.0001)
-        XCTAssertEqual(remainingDuration(units: units, from: 1, speed: .default), 1.0, accuracy: 0.0001)
-        XCTAssertEqual(remainingDuration(units: units, from: 2, speed: .default), 0)
+        let durations = remainingDurations(units: units, speed: .default)
+        XCTAssertEqual(durations.count, 3)
+        XCTAssertEqual(durations[0], 1.3, accuracy: 0.0001)
+        XCTAssertEqual(durations[1], 1.0, accuracy: 0.0001)
+        XCTAssertEqual(durations[2], 0)
+        XCTAssertEqual(remainingDurations(units: [], speed: .default), [0])
     }
 
     func testResumableIndexIsClamped() {

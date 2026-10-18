@@ -36,7 +36,12 @@ final class ReaderModel {
         [Language.ja, .en].filter { language in units.contains { $0.language == language } }
     }
 
-    var remainingSeconds: TimeInterval { remainingDuration(units: units, from: index, speed: speed) }
+    /// 各位置から最後までの残り時間。分割の完了時と速度の変更時に計算し直す。
+    private var remainingDurationsByIndex: [TimeInterval] = [0]
+
+    var remainingSeconds: TimeInterval {
+        remainingDurationsByIndex.indices.contains(index) ? remainingDurationsByIndex[index] : 0
+    }
 
     var isAtEnd: Bool { !units.isEmpty && index == units.count - 1 }
 
@@ -71,6 +76,7 @@ final class ReaderModel {
 
     func changeSpeed(language: Language, by stepDelta: Int) {
         speed = speed.stepped(language: language, by: stepDelta)
+        remainingDurationsByIndex = remainingDurations(units: units, speed: speed)
         saveSpeed(speed)
     }
 
@@ -82,6 +88,7 @@ final class ReaderModel {
                 try TextSegmenter().segment(source)
             }.value
             segmented = result
+            remainingDurationsByIndex = remainingDurations(units: result.units, speed: speed)
             index = resumableIndex(savedIndex: loadPosition(key: textKey(source)), unitCount: result.units.count)
         } catch {
             failureMessage = "本文を区切れませんでした: \(error.localizedDescription)"
