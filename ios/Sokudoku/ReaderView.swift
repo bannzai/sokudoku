@@ -53,8 +53,8 @@ struct ReaderView: View {
             Rectangle().fill(Palette.guide).frame(width: 1, height: 28)
             Text(reader.currentUnit?.text ?? "")
                 .font(.custom("HiraMinProN-W3", size: 40, relativeTo: .largeTitle))
-                .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                // 単位の文字数に上限が無く (長い URL・複合名詞)、1 行に縮めても収まらない単位は省略せず折り返して全文を出す
+                .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("currentUnit")

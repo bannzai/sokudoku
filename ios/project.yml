@@ -2,6 +2,8 @@
 name: Sokudoku
 options:
   bundleIdPrefix: com.bannzai
+  # システムの部品 (貼り付けボタン等) の文言を日本語で出すため。英語の画面はまだ作っていない
+  developmentLanguage: ja
   deploymentTarget:
     iOS: "17.0"
 packages:

@@ -28,9 +28,11 @@ struct ImportView: View {
                 .accessibilityIdentifier("sourceTextEditor")
 
             HStack {
-                Button("貼り付け", systemImage: "doc.on.clipboard") {
-                    text = UIPasteboard.general.string ?? text
+                // UIPasteboard を直接読むと iOS が毎回「ペーストを許可」の確認を出すため、確認の要らないシステムの貼り付けボタンを使う
+                PasteButton(payloadType: String.self) { strings in
+                    text = strings.joined(separator: "\n")
                 }
+                .labelStyle(.titleAndIcon)
                 Button("ファイル", systemImage: "folder") {
                     isImportingFile = true
                 }
