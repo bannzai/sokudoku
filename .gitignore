@@ -6,3 +6,8 @@ next-env.d.ts
 *.tsbuildinfo
 .env*
 .DS_Store
+# ios/project.yml から xcodegen で生成するため入れない
+ios/Sokudoku.xcodeproj/
+ios/build/
+ios/SokudokuCore/.build/
+ios/SokudokuCore/.swiftpm/

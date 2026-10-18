@@ -61,6 +61,8 @@ agent が作ったモック (`documents/design/mock-2026-10-01/index.html`。方
 | 2026-10-05 | 文節分割の後処理 (#31) | BudouX の区切りの後に、ひらがなだけの短い単位と閉じ括弧・句読点で始まる単位を前に、閉じていない括弧を閉じ括弧まで後ろに結合する。品詞・付属語の表は持たず文字種と括弧の対応だけで判定する (`documents/adr/0003-japanese-bunsetsu-segmentation-with-budoux.md` に追記) | agent |
 | 2026-10-05 | URL の構成 (#36) | / をリーダーにし、LP は /about/ へ。/read/ は / へ移す薄いページとして残す。basePath /sokudoku は変えない | bannzai |
 | 2026-10-06 | 読了の表示 (#38) | 読了しても別の読了画面へ切り替えず、リーダー画面で最後の単位を出したまま止め、上部の状態表示を「読了」にして今回の読んだ時間・量・実効速度を出す。判定基準の記録の表は開閉できる「これまでの記録」に入れる。読了後の再生・移動・全文のクリックは、読んだ量と再生時間を捨てた読み直しとして始める。「別の本文を読む」は再生中も含めて常に出す | bannzai (要望) / agent (細部) |
+| 2026-10-18 | iOS アプリ | 商用配布を見据えて iOS ネイティブアプリを作る。まずローカルファースト (本文の区切り・再生・保存を端末内で完結) にする | bannzai |
+| 2026-10-18 | iOS アプリ | SwiftUI で `ios/` に置き、日本語の文節は端末内の MeCab (Mecab-Swift + IPADic) の品詞で組み立てる。Foundation Models は本文を改変するため使わない (`documents/adr/0006-ios-native-app-with-on-device-mecab.md`) | agent (方式) / bannzai (Foundation Models の見送り) |
 
 ## agent に任せること
 

@@ -1,0 +1,15 @@
+{
+  "originHash" : "9211b7fe6d40488baad6f4946c58f473153b96382601bf831986fdb9b22e0fc4",
+  "pins" : [
+    {
+      "identity" : "mecab-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/shinjukunian/Mecab-Swift",
+      "state" : {
+        "revision" : "1f096492e37fc05fc2e7304091f54889974c5368",
+        "version" : "0.8.0"
+      }
+    }
+  ],
+  "version" : 3
+}

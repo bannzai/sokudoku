@@ -1,0 +1,29 @@
+# sokudoku の iOS アプリの Xcode プロジェクト定義。Sokudoku.xcodeproj はこのファイルから xcodegen で生成し、リポジトリには入れない (make ios-project)
+name: Sokudoku
+options:
+  bundleIdPrefix: com.bannzai
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  SokudokuCore:
+    path: SokudokuCore
+targets:
+  Sokudoku:
+    type: application
+    platform: iOS
+    sources: [Sokudoku]
+    dependencies:
+      - package: SokudokuCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: sokudoku
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: 5.0
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
