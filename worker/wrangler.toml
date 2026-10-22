@@ -14,6 +14,11 @@ enabled = false
 enabled = false
 invocation_logs = false
 
+# 取り出した本文の日本語の段落を区切らせる Workers AI (documents/adr/0005-llm-segmentation-for-url-import.md)。
+# 同じアカウントの binding のため API キー・secret は要らない
+[ai]
+binding = "AI"
+
 # 同じ IP から 1 分あたり 30 回まで。period は 10 か 60 だけを指定できる
 [[ratelimits]]
 name = "EXTRACT_RATE_LIMITER"
@@ -21,4 +26,22 @@ namespace_id = "1001"
 
   [ratelimits.simple]
   limit = 30
+  period = 60
+
+# Workers AI に区切らせる記事の数は、同じ IP (IPv6 は /64) から 1 分あたり 2 件まで、全体で 1 分あたり 3 件まで
+# (根拠は src/segment.ts の maxParagraphCount)。超えた記事は区切らせず本文だけを返す
+[[ratelimits]]
+name = "SEGMENT_RATE_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 2
+  period = 60
+
+[[ratelimits]]
+name = "SEGMENT_GLOBAL_RATE_LIMITER"
+namespace_id = "1003"
+
+  [ratelimits.simple]
+  limit = 3
   period = 60
