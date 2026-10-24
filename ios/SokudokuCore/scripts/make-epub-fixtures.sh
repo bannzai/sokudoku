@@ -4,6 +4,8 @@
 #   sample.epub          DRM の無い本。spine の順・ルビ・見出し・段落・表紙や目次の除外を確かめる
 #   drm.epub             sample.epub に、本文の文書 (2 章目) を暗号化した encryption.xml を足したもの
 #   font-obfuscated.epub sample.epub に、フォントの難読化だけの encryption.xml を足したもの
+#   missing-chapter.epub sample.epub の spine に、manifest に無い idref を足したもの
+#   too-large.epub       sample.epub の 1 章目を、展開後の大きさの上限を超える大きさにしたもの
 set -euo pipefail
 
 fixtures_dir="$(cd "$(dirname "$0")/../Tests/SokudokuCoreTests/Fixtures" && pwd)"
@@ -93,6 +95,7 @@ XML
   <p><![CDATA[CDATA の中の文 &amp;]]></p>
   <p>Caf&eacute; and the
     “answer”</p>
+  <table><tr><td>red</td><td>blue</td></tr></table>
 </body>
 </html>
 XML
@@ -134,6 +137,19 @@ write_sample "$work_dir/drm"
 # URI は percent-encode された形で書かれるため、空白を含むパスの章を暗号化した形にし、manifest の href と同じパスに揃えて比べることを確かめる
 write_encryption "$work_dir/drm" "OEBPS/text/chapter%202.xhtml" "http://www.w3.org/2001/04/xmlenc#aes128-cbc"
 pack "$work_dir/drm" "$fixtures_dir/drm.epub"
+
+write_sample "$work_dir/missing-chapter"
+sed -i '' 's|<itemref idref="chapter3"/>|<itemref idref="chapter3"/><itemref idref="missing"/>|' "$work_dir/missing-chapter/OEBPS/content.opf"
+pack "$work_dir/missing-chapter" "$fixtures_dir/missing-chapter.epub"
+
+# 展開後の大きさの上限 (Epub.swift の maxExtractedBytes = 64 MiB) を 1 バイト超える章。空白は圧縮で数十 KB に縮む
+write_sample "$work_dir/too-large"
+{
+  printf '<html xmlns="http://www.w3.org/1999/xhtml"><body><p>'
+  head -c $((64 * 1024 * 1024 + 1)) /dev/zero | tr '\0' ' '
+  printf '</p></body></html>'
+} >"$work_dir/too-large/OEBPS/text/chapter1.xhtml"
+pack "$work_dir/too-large" "$fixtures_dir/too-large.epub"
 
 write_sample "$work_dir/font-obfuscated"
 write_encryption "$work_dir/font-obfuscated" "OEBPS/fonts/font.otf" "http://www.idpf.org/2008/embedding"

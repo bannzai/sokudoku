@@ -1,3 +1,4 @@
+import Compression
 import Foundation
 
 // DRM の無い EPUB から、spine の順に章ごとの本文を取り出す。ZIP の展開と XML の解析は Foundation だけで行い、依存を足さない。
@@ -45,10 +46,16 @@ public func epubBook(data: Data) throws -> EpubBook {
         throw EpubError.unreadable("META-INF/container.xml に OPF の場所がありません")
     }
     let package = parseXML(try archive.read(path: packagePath), delegate: PackageParser())
-    let spinePaths = package.spineIDs.compactMap { id in
-        package.manifest[id].flatMap { item in
-            item.isNavigation ? nil : resolvedPath(href: item.href, baseFilePath: packagePath)
+    let spinePaths = try package.spineIDs.compactMap { id -> String? in
+        // manifest に無い idref・解決できない href は、章が欠けたまま読み進めないよう読めない EPUB とする (Web 版の src/lib/epub.ts と同じ)
+        guard let item = package.manifest[id], let path = resolvedPath(href: item.href, baseFilePath: packagePath) else {
+            throw EpubError.unreadable("spine の \(id) の文書がありません")
         }
+        return item.isNavigation ? nil : path
+    }
+    let readPaths = Set(spinePaths + [packagePath, "META-INF/container.xml", "META-INF/encryption.xml"])
+    guard readPaths.reduce(0, { $0 + (archive.entries[$1]?.uncompressedSize ?? 0) }) <= maxExtractedBytes else {
+        throw EpubError.unreadable("本文が大きすぎます")
     }
     if archive.contains(path: "META-INF/encryption.xml") {
         // フォントの難読化 (IDPF・Adobe) もここに書かれるため、本文の文書が暗号化されている時だけ DRM 付きとみなす
@@ -85,6 +92,11 @@ private func resolvedPath(href: String, baseFilePath: String) -> String? {
 
 // MARK: - ZIP
 
+/// 展開するファイル (container.xml・OPF・encryption.xml・spine の XHTML) の展開後の大きさの合計の上限。Web 版 (src/lib/epub.ts) と同じ値。
+/// 長編小説 1 冊でも本文は 50 万字程度で UTF-8 では 1.5 MB、XHTML のマークアップを含めても 10 MB に届かないため、
+/// 数倍の余裕を持たせつつ、展開後の大きさを偽った ZIP (zip bomb) で端末のメモリを使い切らない大きさにする
+private let maxExtractedBytes = 64 * 1024 * 1024
+
 /// ZIP の中央ディレクトリの 1 項目。読み出しに必要な値だけを持つ。
 private struct ZipEntry {
     /// 圧縮方式。0 は無圧縮、8 は deflate。
@@ -114,6 +126,9 @@ private struct ZipArchive {
         guard let entry = entries[path] else {
             throw EpubError.unreadable("\(path) がありません")
         }
+        guard entry.uncompressedSize <= maxExtractedBytes else {
+            throw EpubError.unreadable("\(path) が大きすぎます")
+        }
         // データの開始位置は、中央ディレクトリではなくローカルヘッダー自身のファイル名・拡張フィールドの長さで決まる (両者は異なり得る)
         let header = entry.localHeaderOffset
         guard header + 30 <= bytes.count, readUInt32(bytes, header) == 0x0403_4B50 else {
@@ -127,12 +142,25 @@ private struct ZipArchive {
         switch entry.method {
         case 0:
             return compressed
+        case 8 where compressed.isEmpty:
+            throw EpubError.unreadable("\(path) を展開できません")
         case 8:
-            // NSData の .zlib はヘッダーの無い raw DEFLATE を扱い、ZIP の圧縮方式 8 と同じ形式
-            guard let inflated = try? (compressed as NSData).decompressed(using: .zlib) as Data, inflated.count == entry.uncompressedSize else {
+            // COMPRESSION_ZLIB はヘッダーの無い raw DEFLATE を扱い、ZIP の圧縮方式 8 と同じ形式。
+            // 展開先を宣言の大きさ + 1 バイトに固定し、大きさを偽った ZIP でも宣言を超えて確保しない (+1 は宣言を超える中身を見分けるため)
+            var inflated = Data(count: entry.uncompressedSize + 1)
+            let inflatedCount = inflated.withUnsafeMutableBytes { destination in
+                compressed.withUnsafeBytes { source in
+                    compression_decode_buffer(
+                        destination.bindMemory(to: UInt8.self).baseAddress!, destination.count,
+                        source.bindMemory(to: UInt8.self).baseAddress!, source.count,
+                        nil, COMPRESSION_ZLIB
+                    )
+                }
+            }
+            guard inflatedCount == entry.uncompressedSize else {
                 throw EpubError.unreadable("\(path) を展開できません")
             }
-            return inflated
+            return inflated.prefix(inflatedCount)
         default:
             throw EpubError.unreadable("\(path) の圧縮方式 (\(entry.method)) に対応していません")
         }
@@ -339,9 +367,11 @@ private func xhtmlDocument(data: Data, path: String) throws -> XHTMLDocument {
 }
 
 /// 本文の区切りとして改行を入れる要素。
+/// Web 版 (src/lib/epub.ts) の blockTagNames と同じ要素に、定義リストの dl を足したもの
 private let blockElements: Set<String> = [
-    "p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "section", "article",
-    "header", "footer", "aside", "figure", "figcaption", "pre", "hr", "tr", "dt", "dd", "table", "ul", "ol", "dl",
+    "address", "article", "aside", "blockquote", "body", "br", "dd", "div", "dl", "dt", "figcaption", "figure", "footer",
+    "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li", "main", "nav", "ol", "p", "pre", "section",
+    "table", "td", "th", "tr", "ul",
 ]
 /// 中身を本文にしない要素。rt・rp はルビの読みと括弧で、本文 (親文字) だけを残すために除く
 private let skippedElements: Set<String> = ["head", "script", "style", "rt", "rp"]

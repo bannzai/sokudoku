@@ -22,7 +22,8 @@ final class EpubTests: XCTestCase {
                 // 見出しの無い章は本文の先頭の行を題名にする。英文の単語の間のソースの改行は、曲線引用符の前でも空白 1 つにし、br は改行にする。
                 // CDATA の中も本文にし (中の &amp; は文字参照ではなくそのままの文字)、&eacute; のような XHTML の DTD の文字参照も読む
                 title: "This is an English line.",
-                text: "This is an English line.\n\n一行目\n二行目\n\nCDATA の中の文 &amp;\n\nCafé and the “answer”"
+                // 表のセルの間も区切る
+                text: "This is an English line.\n\n一行目\n二行目\n\nCDATA の中の文 &amp;\n\nCafé and the “answer”\n\nred\n\nblue"
             ),
             // UTF-16 で保存した文書も、XHTML の DTD の文字参照を含めて読む
             EpubChapter(title: "第三章", text: "第三章\n\nUTF-16 で書いた本文\u{00A0}café"),
@@ -51,6 +52,19 @@ final class EpubTests: XCTestCase {
             guard case .unreadable = error as? EpubError else {
                 return XCTFail("unreadable ではなく \(error) を投げた")
             }
+        }
+    }
+
+    func testSpineItemMissingFromManifestIsUnreadable() throws {
+        // 章が欠けたまま読み進めないよう、残りの章が読めても取り込まない
+        XCTAssertThrowsError(try epubBook(data: fixture(name: "missing-chapter"))) { error in
+            XCTAssertEqual(error as? EpubError, .unreadable("spine の missing の文書がありません"))
+        }
+    }
+
+    func testEpubOverExtractionLimitIsUnreadable() throws {
+        XCTAssertThrowsError(try epubBook(data: fixture(name: "too-large"))) { error in
+            XCTAssertEqual(error as? EpubError, .unreadable("本文が大きすぎます"))
         }
     }
 }
