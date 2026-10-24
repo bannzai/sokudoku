@@ -1,5 +1,6 @@
 // シミュレータで撮った PNG を App Store に出せる形にして上書きする。
-// App Store Connect は alpha のあるスクリーンショットを受け付けないため alpha を落とす。
+// App Store Connect は alpha のあるスクリーンショットを受け付けないため alpha を落とし、
+// アプリの描画と関係なくシステムが写し込むもの (左上の点・ホームインジケータ) を背景の色で塗る。
 // 使い方: swift ios/scripts/flatten-png.swift <png のパス>
 import CoreGraphics
 import Foundation
@@ -32,6 +33,16 @@ if let data = context.data {
         for x in 0 ..< 4 {
             for channel in 0 ..< 4 {
                 pixels[y * context.bytesPerRow + x * 4 + channel] = pixels[sourceOffset + channel]
+            }
+        }
+    }
+    // iOS が描くホームインジケータが、端末の枠より下の背景に写る (persistentSystemOverlays(.hidden) でも消えないことを 2026-10-25 に観測)。
+    // 枠の下端は画面の高さの 98.5% (ios/Sokudoku/AppStoreScreenshots.swift の AppStoreScreenshotDeviceFrame) のため、
+    // それより 1 画素下からの行は背景だけになるよう、各行を左端の画素の色で塗る
+    for y in Int((Double(image.height) * 0.985).rounded(.up)) + 1 ..< image.height {
+        for x in 1 ..< image.width {
+            for channel in 0 ..< 4 {
+                pixels[y * context.bytesPerRow + x * 4 + channel] = pixels[y * context.bytesPerRow + channel]
             }
         }
     }

@@ -41,8 +41,6 @@ struct AppStoreScreenshotPage: View {
         .background(Palette.accent)
         .ignoresSafeArea()
         .statusBarHidden()
-        // ホームインジケータが背景の下端に重なって写るため隠す
-        .persistentSystemOverlays(.hidden)
         .environment(\.colorScheme, .light)
     }
 
