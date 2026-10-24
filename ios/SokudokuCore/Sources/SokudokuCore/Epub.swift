@@ -286,8 +286,13 @@ private struct XHTMLDocument {
     let firstHeading: String?
 }
 
-/// 名前付き文字参照 (`&名前;`)。1 は名前。
-private let namedEntityPattern = try! NSRegularExpression(pattern: "&([A-Za-z][A-Za-z0-9]*);")
+/// 名前付き文字参照 (`&名前;`)。1 は名前。CDATA とコメントの中は文字参照として解釈されないため、名前を取らずに読み飛ばす
+private let namedEntityPattern = try! NSRegularExpression(
+    pattern: #"<!\[CDATA\[.*?\]\]>|<!--.*?-->|&([A-Za-z][A-Za-z0-9]*);"#,
+    options: .dotMatchesLineSeparators
+)
+/// XML 宣言の encoding の指定。1 は指定より前の XML 宣言。
+private let xmlEncodingDeclarationPattern = try! NSRegularExpression(pattern: #"^(\s*<\?xml[^>]*?)\s+encoding\s*=\s*["'][^"']*["']"#)
 
 /// XHTML の DTD が定義する名前付き文字参照 (`htmlNamedEntities`) を数値の文字参照に置き換えた文字列を返す。表に無い名前はそのまま残す。
 private func replacingHTMLNamedEntities(_ source: String) -> String {
@@ -295,7 +300,7 @@ private func replacingHTMLNamedEntities(_ source: String) -> String {
     var result = ""
     var copiedEnd = 0
     for match in namedEntityPattern.matches(in: source, range: NSRange(location: 0, length: nsSource.length)) {
-        guard let codePoint = htmlNamedEntities[nsSource.substring(with: match.range(at: 1))] else {
+        guard match.range(at: 1).location != NSNotFound, let codePoint = htmlNamedEntities[nsSource.substring(with: match.range(at: 1))] else {
             continue
         }
         result += nsSource.substring(with: NSRange(location: copiedEnd, length: match.range.location - copiedEnd)) + "&#\(codePoint);"
@@ -304,10 +309,26 @@ private func replacingHTMLNamedEntities(_ source: String) -> String {
     return result + nsSource.substring(from: copiedEnd)
 }
 
+/// UTF-8 か UTF-16 (BOM 付き) の XML の文書を文字列にして返す。UTF-8 のバイト列にして解析し直すため、XML 宣言の encoding の指定は除く (指定が無ければ UTF-8 として読まれる)。
+/// どちらでも読めなければ nil を返す。
+private func xmlSource(data: Data) -> String? {
+    let hasUTF16ByteOrderMark = data.starts(with: [0xFE, 0xFF]) || data.starts(with: [0xFF, 0xFE])
+    guard let decoded = hasUTF16ByteOrderMark ? String(data: data, encoding: .utf16) : String(data: data, encoding: .utf8) else {
+        return nil
+    }
+    // BOM が文字として残ると XML 宣言が文書の先頭に無いことになり、encoding の指定を除けないため外す
+    let source = decoded.hasPrefix("\u{FEFF}") ? String(decoded.dropFirst()) : decoded
+    return xmlEncodingDeclarationPattern.stringByReplacingMatches(
+        in: source,
+        range: NSRange(location: 0, length: (source as NSString).length),
+        withTemplate: "$1"
+    )
+}
+
 /// 本文の XHTML から本文のテキストと最初の見出しを取り出す。解析できなければ `EpubError.unreadable` を投げる。
 private func xhtmlDocument(data: Data, path: String) throws -> XHTMLDocument {
-    // UTF-8 以外 (UTF-16 等) の文書は、文字コードを XML 宣言・BOM から XMLParser に判定させるため、置き換えずにそのまま渡す
-    let parser = XMLParser(data: String(data: data, encoding: .utf8).map { Data(replacingHTMLNamedEntities($0).utf8) } ?? data)
+    // UTF-8 と UTF-16 (XML の仕様で BOM が必須) 以外の文字コードの文書は、文字コードを XML 宣言から XMLParser に判定させるため、置き換えずにそのまま渡す
+    let parser = XMLParser(data: xmlSource(data: data).map { Data(replacingHTMLNamedEntities($0).utf8) } ?? data)
     parser.shouldProcessNamespaces = true
     let delegate = XHTMLTextParser()
     parser.delegate = delegate

@@ -65,7 +65,8 @@ struct ImportView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            // EPUB の取り出し中にリーダーへ移ると、取り出しの完了で戻り先が章の一覧に変わるため、終わるまで開かせない
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isOpeningBook)
             .accessibilityIdentifier("readButton")
 
             Text("文章の区切りと再生はすべてこの端末の中で行い、文章を外部へ送りません。")

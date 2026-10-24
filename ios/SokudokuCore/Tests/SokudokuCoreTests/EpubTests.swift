@@ -20,12 +20,12 @@ final class EpubTests: XCTestCase {
             ),
             EpubChapter(
                 // 見出しの無い章は本文の先頭の行を題名にする。英文の単語の間のソースの改行は、曲線引用符の前でも空白 1 つにし、br は改行にする。
-                // CDATA の中も本文にし、&eacute; のような XHTML の DTD の文字参照も読む
+                // CDATA の中も本文にし (中の &amp; は文字参照ではなくそのままの文字)、&eacute; のような XHTML の DTD の文字参照も読む
                 title: "This is an English line.",
-                text: "This is an English line.\n\n一行目\n二行目\n\nCDATA の中の文\n\nCafé and the “answer”"
+                text: "This is an English line.\n\n一行目\n二行目\n\nCDATA の中の文 &amp;\n\nCafé and the “answer”"
             ),
-            // UTF-16 で保存した文書も読む
-            EpubChapter(title: "第三章", text: "第三章\n\nUTF-16 で書いた本文"),
+            // UTF-16 で保存した文書も、XHTML の DTD の文字参照を含めて読む
+            EpubChapter(title: "第三章", text: "第三章\n\nUTF-16 で書いた本文\u{00A0}café"),
         ])
     }
 

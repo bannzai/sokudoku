@@ -90,7 +90,7 @@ XML
   <p>This is
     an English line.</p>
   <p>一行目<br/>二行目</p>
-  <p><![CDATA[CDATA の中の文]]></p>
+  <p><![CDATA[CDATA の中の文 &amp;]]></p>
   <p>Caf&eacute; and the
     “answer”</p>
 </body>
@@ -101,7 +101,7 @@ XML
 <?xml version="1.0" encoding="UTF-16"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>3</title></head>
-<body><h2>第三章</h2><p>UTF-16 で書いた本文</p></body>
+<body><h2>第三章</h2><p>UTF-16 で書いた本文&nbsp;caf&eacute;</p></body>
 </html>
 XML
 }
