@@ -23,6 +23,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # テストとビルドが依存のコードを実行するため、後続の step へ checkout のトークンを残さない。この job は git の操作をしない
+        with:
+          persist-credentials: false
 
       # make build-ios が ios/project.yml から Xcode プロジェクトを生成するために使う
       - run: brew install xcodegen
