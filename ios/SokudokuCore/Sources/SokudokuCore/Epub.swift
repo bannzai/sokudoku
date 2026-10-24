@@ -27,6 +27,16 @@ public enum EpubError: Error, Equatable {
     case unreadable(String)
 }
 
+extension EpubError: LocalizedError {
+    /// 取り込み画面に出す理由。
+    public var errorDescription: String? {
+        switch self {
+        case .drmProtected: "DRM 付きの書籍は読めません"
+        case .unreadable(let reason): reason
+        }
+    }
+}
+
 /// EPUB のファイルの中身から本を取り出す。本文の文書が暗号化されていれば `EpubError.drmProtected` を投げる。
 public func epubBook(data: Data) throws -> EpubBook {
     let archive = try zipEntries(data: data)
