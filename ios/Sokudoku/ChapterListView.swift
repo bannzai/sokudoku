@@ -19,7 +19,6 @@ struct ChapterListView: View {
                     // 見出しの無い章は本文の先頭の行を題名にしており、段落 1 つ分の長さになり得るため 1 行に収める
                     Text(chapter.title)
                         .lineLimit(1)
-                        .foregroundStyle(.primary)
                     Text("\(chapter.text.count) 字")
                         .font(.footnote.monospacedDigit())
                         .foregroundStyle(.secondary)
