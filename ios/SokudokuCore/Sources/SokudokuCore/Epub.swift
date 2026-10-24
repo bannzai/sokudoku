@@ -297,11 +297,12 @@ private let htmlNamedEntities: [String: Int] = [
 
 /// 本文の XHTML から本文のテキストと最初の見出しを取り出す。解析できなければ `EpubError.unreadable` を投げる。
 private func xhtmlDocument(data: Data, path: String) throws -> XHTMLDocument {
-    var source = String(decoding: data, as: UTF8.self)
-    for (name, codePoint) in htmlNamedEntities {
-        source = source.replacingOccurrences(of: "&\(name);", with: "&#\(codePoint);")
-    }
-    let parser = XMLParser(data: Data(source.utf8))
+    // UTF-8 以外 (UTF-16 等) の文書は、文字コードを XML 宣言・BOM から XMLParser に判定させるため、置き換えずにそのまま渡す
+    let parser = XMLParser(data: String(data: data, encoding: .utf8).map { utf8Source in
+        Data(htmlNamedEntities.reduce(utf8Source) { source, entity in
+            source.replacingOccurrences(of: "&\(entity.key);", with: "&#\(entity.value);")
+        }.utf8)
+    } ?? data)
     parser.shouldProcessNamespaces = true
     let delegate = XHTMLTextParser()
     parser.delegate = delegate
@@ -350,6 +351,11 @@ private final class XHTMLTextParser: NSObject, XMLParserDelegate {
             raw.append(string)
             headingBuffer?.append(string)
         }
+    }
+
+    /// CDATA の中の文字も本文にする。XMLParser は CDATA を foundCharacters ではなくこちらで渡す。
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        self.parser(parser, foundCharacters: String(decoding: CDATABlock, as: UTF8.self))
     }
 
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {

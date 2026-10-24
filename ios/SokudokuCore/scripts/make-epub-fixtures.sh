@@ -37,12 +37,14 @@ XML
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
     <item id="notes" href="notes.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapter3" href="text/chapter3.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine>
     <itemref idref="cover"/>
     <itemref idref="nav"/>
     <itemref idref="chapter1"/>
     <itemref idref="chapter2"/>
+    <itemref idref="chapter3"/>
     <itemref idref="notes" linear="no"/>
   </spine>
 </package>
@@ -88,7 +90,16 @@ XML
   <p>This is
     an English line.</p>
   <p>一行目<br/>二行目</p>
+  <p><![CDATA[CDATA の中の文]]></p>
 </body>
+</html>
+XML
+  # UTF-16 (BOM 付き) で保存した文書も、XML 宣言の文字コードで読めることを確かめる
+  iconv -f UTF-8 -t UTF-16 >"$root/OEBPS/text/chapter3.xhtml" <<'XML'
+<?xml version="1.0" encoding="UTF-16"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>3</title></head>
+<body><h2>第三章</h2><p>UTF-16 で書いた本文</p></body>
 </html>
 XML
 }

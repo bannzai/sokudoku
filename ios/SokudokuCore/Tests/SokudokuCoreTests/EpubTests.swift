@@ -19,10 +19,12 @@ final class EpubTests: XCTestCase {
                 text: "第一章　猫\n\n吾輩は猫である。名前はまだ無い。\n\nどこで生れたか\u{00A0}とんと見当がつかぬ。"
             ),
             EpubChapter(
-                // 見出しの無い章は本文の先頭の行を題名にする。英文の単語の間のソースの改行は空白 1 つにし、br は改行にする
+                // 見出しの無い章は本文の先頭の行を題名にする。英文の単語の間のソースの改行は空白 1 つにし、br は改行にする。CDATA の中も本文にする
                 title: "This is an English line.",
-                text: "This is an English line.\n\n一行目\n二行目"
+                text: "This is an English line.\n\n一行目\n二行目\n\nCDATA の中の文"
             ),
+            // UTF-16 で保存した文書も読む
+            EpubChapter(title: "第三章", text: "第三章\n\nUTF-16 で書いた本文"),
         ])
     }
 
