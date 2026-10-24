@@ -152,6 +152,10 @@ private struct AppStoreScreenshotDeviceFrame<Content: View>: View {
             .frame(width: screenSize.width, height: screenSize.height)
             .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .circular))
+            // 切り抜かれないナビゲーションバーの端が、丸みの終わりで縁から 1pt ほどはみ出す (2026-10-25 にスクリーンショットで観測) ため、縁を枠の色でなぞって隠す (線は縁をまたいで外側にも 2pt かかる)
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .circular).stroke(Color(white: 0.08), lineWidth: 4)
+            }
             .overlay(alignment: .top) {
                 if !isPad {
                     Capsule().fill(.black).frame(width: 126, height: 37).padding(.top, 11)
