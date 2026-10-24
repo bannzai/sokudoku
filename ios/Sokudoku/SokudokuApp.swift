@@ -5,7 +5,15 @@ import SwiftUI
 struct SokudokuApp: App {
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            if let screenshot = appStoreScreenshotLaunchArguments() {
+                AppStoreScreenshotPage(page: screenshot.page, language: screenshot.language)
+            } else {
+                RootView()
+            }
+            #else
             RootView()
+            #endif
         }
     }
 }

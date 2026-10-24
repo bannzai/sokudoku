@@ -12,4 +12,11 @@ describe("renderLegalDocument", () => {
     expect(html).toContain("<h1>プライバシーポリシー</h1>");
     expect(html).toContain("bannzai.app@gmail.com");
   });
+
+  // App Store Connect のプライバシーポリシーの URL がこのページを指すため (ios/fastlane/metadata)、iOS アプリの扱いを載せる
+  it("プライバシーポリシーに iOS アプリの本文の扱いが載る", async () => {
+    const html = await renderLegalDocument("privacy");
+    expect(html).toContain("<h3>iOS アプリ</h3>");
+    expect(html).toContain("提供者は、iOS アプリの利用に伴って利用者情報を収集しません");
+  });
 });
