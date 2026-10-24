@@ -48,6 +48,7 @@ for entry in "${devices[@]}"; do
       sleep 5
       out="ios/fastlane/screenshots/$fastlane_language/${page}_${device_label}.png"
       xcrun simctl io "$udid" screenshot --type=png "$out" >/dev/null
+      swift ios/scripts/flatten-png.swift "$out"
       sips -g pixelWidth -g pixelHeight -g hasAlpha "$out" | tail -n 3 | tr -s ' \n' ' '
       echo "$out"
     done

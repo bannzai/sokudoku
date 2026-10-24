@@ -13,26 +13,28 @@ struct AppStoreScreenshotPage: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
+            // 文字の大きさの基準。iPad は横に広く縦の比率が iPhone と違うため、幅だけで決めると見出しが枠に重なる。
+            // 高さの 0.46 倍は、iPhone 6.9 インチ (440x956pt) で幅とほぼ同じになる値
+            let copyBaseSize = min(geometry.size.width, geometry.size.height * 0.46)
+            ZStack(alignment: .top) {
+                // 端末の枠の中は、撮影する端末と同じ大きさ・同じ位置で画面を組み立ててから縮めて出す (本番と同じ折り返し・配置にするため)。
+                // 0.72 倍は、上の 24% (キャッチコピー) の残りに枠の縁まで収まる倍率
+                AppStoreScreenshotDeviceFrame(screenSize: geometry.size, scale: 0.72) {
+                    screenContent
+                }
                 VStack(spacing: 12) {
                     Text(copy.title)
-                        .font(.system(size: geometry.size.width * 0.085, weight: .bold))
+                        .font(.system(size: copyBaseSize * 0.085, weight: .bold))
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                     Text(copy.subtitle)
-                        .font(.system(size: geometry.size.width * 0.04, weight: .regular))
+                        .font(.system(size: copyBaseSize * 0.04, weight: .regular))
                         .opacity(0.85)
                         .multilineTextAlignment(.center)
                 }
                 .foregroundStyle(.white)
                 .frame(height: geometry.size.height * 0.21)
                 .padding(.top, geometry.size.height * 0.03)
-                // 端末の枠の中は、撮影する端末と同じ大きさで画面を組み立ててから縮めて出す (本番と同じ折り返し・配置にするため)。
-                // 0.72 倍は、上の 24% (キャッチコピー) の残りに枠の縁まで収まる倍率
-                AppStoreScreenshotDeviceFrame(screenSize: geometry.size, scale: 0.72) {
-                    screenContent
-                }
-                Spacer(minLength: 0)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
@@ -128,7 +130,9 @@ private struct AppStoreScreenshotReader: View {
     }
 }
 
-/// 端末の枠。中身を screenSize の大きさで組み立て、scale 倍に縮めて枠に収める。
+/// 端末の枠。中身を画面全体と同じ大きさ・位置で組み立て、scale 倍に縮めて画面の下寄りに出す。
+/// 中身を画面からずらして組み立てると、ナビゲーションバーの大きい見出しが左端に詰まる (2026-10-25 に iOS 26 のシミュレータで観測) ため、
+/// 組み立てる位置は画面に合わせ、縮小と移動は見た目だけの scaleEffect で行う。
 private struct AppStoreScreenshotDeviceFrame<Content: View>: View {
     let screenSize: CGSize
     let scale: CGFloat
@@ -139,9 +143,13 @@ private struct AppStoreScreenshotDeviceFrame<Content: View>: View {
         let isPad = screenSize.width >= 700
         let cornerRadius: CGFloat = isPad ? 36 : 56
         let bezel: CGFloat = isPad ? 22 : 16
+        // 縮めた枠の下端を画面の高さの 98.5% に置くための、縮小の中心 (縦方向の割合)。
+        // 枠の下端は組み立てた位置で screenSize.height + bezel にあり、縮小の中心から scale 倍の距離に寄る
+        let anchorY = (screenSize.height * 0.985 - (screenSize.height + bezel) * scale) / (screenSize.height * (1 - scale))
         content
-            // 枠の中は画面の上端に接していないため、本番のステータスバーの高さぶんの余白を取る
-            .padding(.top, isPad ? 24 : 54)
+            // 枠の中は上端がステータスバーの位置に当たらないため、ステータスバーの高さぶんの余白を取る。
+            // 角の丸みより小さいと、中身の上端の角が丸みの外にはみ出して段になる (2026-10-25 にスクリーンショットで観測) ため、丸みより大きくする
+            .padding(.top, isPad ? 40 : 62)
             .frame(width: screenSize.width, height: screenSize.height)
             .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -152,8 +160,8 @@ private struct AppStoreScreenshotDeviceFrame<Content: View>: View {
             }
             .padding(bezel)
             .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: cornerRadius + bezel, style: .continuous))
-            .scaleEffect(scale)
-            .frame(width: (screenSize.width + bezel * 2) * scale, height: (screenSize.height + bezel * 2) * scale)
+            .frame(width: screenSize.width, height: screenSize.height)
+            .scaleEffect(scale, anchor: UnitPoint(x: 0.5, y: anchorY))
     }
 }
 
