@@ -98,6 +98,10 @@ struct ImportView: View {
         }
         .padding()
         .navigationTitle("sokudoku")
+        // URL の取得中に本文を入力・貼り付けしたら、取得が終わってもリーダーへ移らず入力中の本文を残す
+        .onChange(of: text) {
+            latestImportRequestID += 1
+        }
         .onChange(of: pendingSharedImport, initial: true) {
             guard let sharedImport = pendingSharedImport else {
                 return
