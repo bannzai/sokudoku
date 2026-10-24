@@ -73,6 +73,12 @@ final class EpubTests: XCTestCase {
         }
     }
 
+    func testRepeatedSpineItemCountsTowardExtractionLimit() throws {
+        XCTAssertThrowsError(try epubBook(data: fixture(name: "repeated-chapter"))) { error in
+            XCTAssertEqual(error as? EpubError, .unreadable("本文が大きすぎます"))
+        }
+    }
+
     func testEpubOverExtractionLimitIsUnreadable() throws {
         XCTAssertThrowsError(try epubBook(data: fixture(name: "too-large"))) { error in
             XCTAssertEqual(error as? EpubError, .unreadable("本文が大きすぎます"))

@@ -53,7 +53,8 @@ public func epubBook(data: Data) throws -> EpubBook {
         }
         return item.isNavigation ? nil : path
     }
-    let readPaths = Set(spinePaths + [packagePath, "META-INF/container.xml", "META-INF/encryption.xml"])
+    // spine に同じ文書が何度並んでも、展開する回数どおりに数える (重複を除くと、同じ文書を何度も展開して上限をすり抜けられる)
+    let readPaths = spinePaths + [packagePath, "META-INF/container.xml", "META-INF/encryption.xml"]
     guard readPaths.reduce(0, { $0 + (archive.entries[$1]?.uncompressedSize ?? 0) }) <= maxExtractedBytes else {
         throw EpubError.unreadable("本文が大きすぎます")
     }

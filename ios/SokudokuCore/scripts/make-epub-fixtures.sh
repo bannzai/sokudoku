@@ -7,6 +7,7 @@
 #   broken-package.epub  sample.epub の OPF を spine の途中で終わらせたもの
 #   missing-chapter.epub sample.epub の spine に、manifest に無い idref を足したもの
 #   too-large.epub       sample.epub の 1 章目を、展開後の大きさの上限を超える大きさにしたもの
+#   repeated-chapter.epub 上限の半分を超える 1 章目を spine に 2 回並べたもの
 set -euo pipefail
 
 fixtures_dir="$(cd "$(dirname "$0")/../Tests/SokudokuCoreTests/Fixtures" && pwd)"
@@ -157,6 +158,16 @@ write_sample "$work_dir/too-large"
   printf '</p></body></html>'
 } >"$work_dir/too-large/OEBPS/text/chapter1.xhtml"
 pack "$work_dir/too-large" "$fixtures_dir/too-large.epub"
+
+# 上限の半分 + 1 バイトの章を spine に 2 回並べ、1 つの文書の大きさは上限以下でも展開の合計が上限を超えることを確かめる
+write_sample "$work_dir/repeated-chapter"
+{
+  printf '<html xmlns="http://www.w3.org/1999/xhtml"><body><p>'
+  head -c $((32 * 1024 * 1024 + 1)) /dev/zero | tr '\0' ' '
+  printf '</p></body></html>'
+} >"$work_dir/repeated-chapter/OEBPS/text/chapter1.xhtml"
+sed -i '' 's|<itemref idref="chapter1"/>|<itemref idref="chapter1"/><itemref idref="chapter1"/>|' "$work_dir/repeated-chapter/OEBPS/content.opf"
+pack "$work_dir/repeated-chapter" "$fixtures_dir/repeated-chapter.epub"
 
 write_sample "$work_dir/font-obfuscated"
 write_encryption "$work_dir/font-obfuscated" "OEBPS/fonts/font.otf" "http://www.idpf.org/2008/embedding"
