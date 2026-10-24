@@ -47,6 +47,8 @@ struct ImportView: View {
                 }
                 .labelStyle(.titleAndIcon)
                 Button("ファイル", systemImage: "folder") {
+                    // ファイルを選んでいる間に URL の取得が終わっても、リーダーへ移ってファイルの選択を中断しないようにする
+                    latestImportRequestID += 1
                     isImportingFile = true
                 }
                 Button("見本", systemImage: "text.book.closed") {
@@ -123,7 +125,6 @@ struct ImportView: View {
         }
         .fileImporter(isPresented: $isImportingFile, allowedContentTypes: [.plainText]) { result in
             importFailureMessage = nil
-            latestImportRequestID += 1
             switch result {
             case .success(let url):
                 do {
