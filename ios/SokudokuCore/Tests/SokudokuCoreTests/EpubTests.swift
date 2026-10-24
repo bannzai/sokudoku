@@ -15,8 +15,9 @@ final class EpubTests: XCTestCase {
         XCTAssertEqual(book.chapters, [
             EpubChapter(
                 title: "第一章　猫",
-                // 見出しと段落は空行で区切る。段落の中のソースの改行は、日本語の文字の間なら詰める。style・script・画像は本文にしない
-                text: "第一章　猫\n\n吾輩は猫である。名前はまだ無い。\n\nどこで生れたか\u{00A0}とんと見当がつかぬ。"
+                // 見出しと段落は空行で区切る。段落の中のソースの改行は、日本語の文字の間なら詰める。style・script・画像は本文にしない。
+                // pre の中の改行は詰めずに残す
+                text: "第一章　猫\n\n吾輩は猫である。名前はまだ無い。\n\nどこで生れたか\u{00A0}とんと見当がつかぬ。\n\n一行目の詩\n二行目の詩"
             ),
             EpubChapter(
                 // 見出しの無い章は本文の先頭の行を題名にする。英文の単語の間のソースの改行は、曲線引用符の前でも空白 1 つにし、br は改行にする。
@@ -52,6 +53,16 @@ final class EpubTests: XCTestCase {
             guard case .unreadable = error as? EpubError else {
                 return XCTFail("unreadable ではなく \(error) を投げた")
             }
+        }
+    }
+
+    func testBrokenPackageDocumentIsUnreadable() throws {
+        // 壊れる前に読めた章だけで取り込まない
+        XCTAssertThrowsError(try epubBook(data: fixture(name: "broken-package"))) { error in
+            guard case .unreadable(let reason) = error as? EpubError else {
+                return XCTFail("unreadable ではなく \(error) を投げた")
+            }
+            XCTAssertTrue(reason.hasPrefix("OEBPS/content.opf を解析できません"), reason)
         }
     }
 

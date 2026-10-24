@@ -4,6 +4,7 @@
 #   sample.epub          DRM の無い本。spine の順・ルビ・見出し・段落・表紙や目次の除外を確かめる
 #   drm.epub             sample.epub に、本文の文書 (2 章目) を暗号化した encryption.xml を足したもの
 #   font-obfuscated.epub sample.epub に、フォントの難読化だけの encryption.xml を足したもの
+#   broken-package.epub  sample.epub の OPF を spine の途中で終わらせたもの
 #   missing-chapter.epub sample.epub の spine に、manifest に無い idref を足したもの
 #   too-large.epub       sample.epub の 1 章目を、展開後の大きさの上限を超える大きさにしたもの
 set -euo pipefail
@@ -81,6 +82,8 @@ XML
     まだ無い。</p>
   <script type="text/javascript">alert("スクリプト");</script>
   <p><img src="cat.png" alt="猫の絵"/>どこで生れたか&nbsp;とんと見当がつかぬ。</p>
+  <pre>一行目の詩
+二行目の詩</pre>
 </body>
 </html>
 XML
@@ -137,6 +140,10 @@ write_sample "$work_dir/drm"
 # URI は percent-encode された形で書かれるため、空白を含むパスの章を暗号化した形にし、manifest の href と同じパスに揃えて比べることを確かめる
 write_encryption "$work_dir/drm" "OEBPS/text/chapter%202.xhtml" "http://www.w3.org/2001/04/xmlenc#aes128-cbc"
 pack "$work_dir/drm" "$fixtures_dir/drm.epub"
+
+write_sample "$work_dir/broken-package"
+sed -i '' -e '/<\/spine>/d' -e '/<\/package>/d' "$work_dir/broken-package/OEBPS/content.opf"
+pack "$work_dir/broken-package" "$fixtures_dir/broken-package.epub"
 
 write_sample "$work_dir/missing-chapter"
 sed -i '' 's|<itemref idref="chapter3"/>|<itemref idref="chapter3"/><itemref idref="missing"/>|' "$work_dir/missing-chapter/OEBPS/content.opf"

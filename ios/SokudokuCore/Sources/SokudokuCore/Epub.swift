@@ -42,10 +42,10 @@ extension EpubError: LocalizedError {
 public func epubBook(data: Data) throws -> EpubBook {
     let archive = try zipEntries(data: data)
     let containerXML = try archive.read(path: "META-INF/container.xml")
-    guard let packagePath = parseXML(containerXML, delegate: ContainerParser()).packagePath else {
+    guard let packagePath = try parseXML(containerXML, path: "META-INF/container.xml", delegate: ContainerParser()).packagePath else {
         throw EpubError.unreadable("META-INF/container.xml に OPF の場所がありません")
     }
-    let package = parseXML(try archive.read(path: packagePath), delegate: PackageParser())
+    let package = try parseXML(archive.read(path: packagePath), path: packagePath, delegate: PackageParser())
     let spinePaths = try package.spineIDs.compactMap { id -> String? in
         // manifest に無い idref・解決できない href は、章が欠けたまま読み進めないよう読めない EPUB とする (Web 版の src/lib/epub.ts と同じ)
         guard let item = package.manifest[id], let path = resolvedPath(href: item.href, baseFilePath: packagePath) else {
@@ -59,7 +59,9 @@ public func epubBook(data: Data) throws -> EpubBook {
     }
     if archive.contains(path: "META-INF/encryption.xml") {
         // フォントの難読化 (IDPF・Adobe) もここに書かれるため、本文の文書が暗号化されている時だけ DRM 付きとみなす
-        let encryptedPaths = Set(parseXML(try archive.read(path: "META-INF/encryption.xml"), delegate: EncryptionParser()).cipherReferences.compactMap {
+        let encryptedPaths = Set(try parseXML(
+            archive.read(path: "META-INF/encryption.xml"), path: "META-INF/encryption.xml", delegate: EncryptionParser()
+        ).cipherReferences.compactMap {
             resolvedPath(href: $0, baseFilePath: "")
         })
         if spinePaths.contains(where: encryptedPaths.contains) {
@@ -141,6 +143,10 @@ private struct ZipArchive {
         let compressed = Data(bytes[start..<(start + entry.compressedSize)])
         switch entry.method {
         case 0:
+            // 宣言の大きさで上限を判定しているため、無圧縮の中身が宣言と違えば上限を超え得る。読まずに扱う
+            guard entry.compressedSize == entry.uncompressedSize else {
+                throw EpubError.unreadable("\(path) の大きさが宣言と一致しません")
+            }
             return compressed
         case 8 where compressed.isEmpty:
             throw EpubError.unreadable("\(path) を展開できません")
@@ -223,12 +229,15 @@ private func readUInt32(_ bytes: [UInt8], _ offset: Int) -> UInt32 {
 
 // MARK: - XML
 
-/// XMLParser で解析し、解析を終えた delegate を返す。解析の失敗は delegate が集めた分だけを使う (container.xml・OPF・encryption.xml は値が欠けたら呼び出し側が扱う)。
-private func parseXML<Delegate: NSObject & XMLParserDelegate>(_ data: Data, delegate: Delegate) -> Delegate {
+/// XMLParser で解析し、解析を終えた delegate を返す。途中で壊れた XML は、集めた分だけで読み進めると章などが欠けるため、`EpubError.unreadable` を投げる。
+/// `path` はエラーに出す、ZIP の中のファイルのパス。
+private func parseXML<Delegate: NSObject & XMLParserDelegate>(_ data: Data, path: String, delegate: Delegate) throws -> Delegate {
     let parser = XMLParser(data: data)
     parser.shouldProcessNamespaces = true
     parser.delegate = delegate
-    parser.parse()
+    guard parser.parse() else {
+        throw EpubError.unreadable("\(path) を解析できません: \(parser.parserError?.localizedDescription ?? "")")
+    }
     return delegate
 }
 
@@ -388,10 +397,15 @@ private final class XHTMLTextParser: NSObject, XMLParserDelegate {
     private(set) var firstHeading: String?
     /// 中身を本文にしない要素の入れ子の深さ。0 の時だけ文字を本文にする。
     private var skipDepth = 0
+    /// pre の入れ子の深さ。pre の中の改行は詩の行などの区切りのため、詰めずに改行として残す (Web 版の src/lib/epub.ts と同じ)。
+    private var preformattedDepth = 0
     /// 最初の見出しを読んでいる間だけ、その中の文字を集める。
     private var headingBuffer: String?
 
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {
+        if elementName == "pre" {
+            preformattedDepth += 1
+        }
         if skippedElements.contains(elementName) {
             skipDepth += 1
         } else if skipDepth == 0, blockElements.contains(elementName) {
@@ -404,8 +418,11 @@ private final class XHTMLTextParser: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
         if skipDepth == 0 {
-            raw.append(string)
-            headingBuffer?.append(string)
+            let text = preformattedDepth > 0
+                ? string.replacingOccurrences(of: #"\r\n|\r|\n"#, with: String(blockBreak), options: .regularExpression)
+                : string
+            raw.append(text)
+            headingBuffer?.append(text)
         }
     }
 
@@ -415,6 +432,9 @@ private final class XHTMLTextParser: NSObject, XMLParserDelegate {
     }
 
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {
+        if elementName == "pre" {
+            preformattedDepth -= 1
+        }
         if skippedElements.contains(elementName) {
             skipDepth -= 1
         } else if skipDepth == 0, blockElements.contains(elementName), elementName != "br" {
