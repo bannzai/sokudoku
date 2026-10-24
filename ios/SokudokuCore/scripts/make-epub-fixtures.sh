@@ -91,6 +91,8 @@ XML
     an English line.</p>
   <p>一行目<br/>二行目</p>
   <p><![CDATA[CDATA の中の文]]></p>
+  <p>Caf&eacute; and the
+    “answer”</p>
 </body>
 </html>
 XML

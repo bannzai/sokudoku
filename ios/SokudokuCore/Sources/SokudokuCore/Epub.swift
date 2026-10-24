@@ -286,23 +286,28 @@ private struct XHTMLDocument {
     let firstHeading: String?
 }
 
-/// HTML の名前付き文字参照のうち XML が定義しないもの。XHTML 1.1 の DOCTYPE の外部 DTD を XMLParser が読まないため未定義のエラーになる。
-/// 青空文庫や一般の EPUB の本文で使われる空白・ダッシュ・引用符に絞り、数値の文字参照に置き換えてから解析する
-private let htmlNamedEntities: [String: Int] = [
-    "nbsp": 0x00A0, "ensp": 0x2002, "emsp": 0x2003, "thinsp": 0x2009,
-    "ndash": 0x2013, "mdash": 0x2014, "hellip": 0x2026, "middot": 0x00B7,
-    "lsquo": 0x2018, "rsquo": 0x2019, "ldquo": 0x201C, "rdquo": 0x201D,
-    "laquo": 0x00AB, "raquo": 0x00BB, "copy": 0x00A9, "reg": 0x00AE, "trade": 0x2122, "times": 0x00D7,
-]
+/// 名前付き文字参照 (`&名前;`)。1 は名前。
+private let namedEntityPattern = try! NSRegularExpression(pattern: "&([A-Za-z][A-Za-z0-9]*);")
+
+/// XHTML の DTD が定義する名前付き文字参照 (`htmlNamedEntities`) を数値の文字参照に置き換えた文字列を返す。表に無い名前はそのまま残す。
+private func replacingHTMLNamedEntities(_ source: String) -> String {
+    let nsSource = source as NSString
+    var result = ""
+    var copiedEnd = 0
+    for match in namedEntityPattern.matches(in: source, range: NSRange(location: 0, length: nsSource.length)) {
+        guard let codePoint = htmlNamedEntities[nsSource.substring(with: match.range(at: 1))] else {
+            continue
+        }
+        result += nsSource.substring(with: NSRange(location: copiedEnd, length: match.range.location - copiedEnd)) + "&#\(codePoint);"
+        copiedEnd = match.range.location + match.range.length
+    }
+    return result + nsSource.substring(from: copiedEnd)
+}
 
 /// 本文の XHTML から本文のテキストと最初の見出しを取り出す。解析できなければ `EpubError.unreadable` を投げる。
 private func xhtmlDocument(data: Data, path: String) throws -> XHTMLDocument {
     // UTF-8 以外 (UTF-16 等) の文書は、文字コードを XML 宣言・BOM から XMLParser に判定させるため、置き換えずにそのまま渡す
-    let parser = XMLParser(data: String(data: data, encoding: .utf8).map { utf8Source in
-        Data(htmlNamedEntities.reduce(utf8Source) { source, entity in
-            source.replacingOccurrences(of: "&\(entity.key);", with: "&#\(entity.value);")
-        }.utf8)
-    } ?? data)
+    let parser = XMLParser(data: String(data: data, encoding: .utf8).map { Data(replacingHTMLNamedEntities($0).utf8) } ?? data)
     parser.shouldProcessNamespaces = true
     let delegate = XHTMLTextParser()
     parser.delegate = delegate
@@ -371,13 +376,20 @@ private final class XHTMLTextParser: NSObject, XMLParserDelegate {
     }
 }
 
+/// 日本語の文字 (漢字・ひらがな・カタカナ・全角の記号と句読点・全角形)。ソースの改行を詰めるかの判定に使う。
+private let japaneseCharacterClass = #"[\p{Han}\p{Hiragana}\p{Katakana}\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]"#
+
 /// 集めた本文の空白を整え、ブロックの区切りを改行にする。
-/// ソースの改行 (と前後の空白) は、両側が ASCII の文字 (英文の単語の間) なら空白 1 つに、それ以外 (日本語の文字の間) なら何も残さない。
+/// ソースの改行 (と前後の空白) は、両側が日本語の文字なら何も残さず、それ以外 (英文の単語の間・アクセント付きの文字や曲線引用符の前後) は空白 1 つにする。
 /// 区切りが続いた時は空行 1 つまでにする
 private func normalizedText(_ raw: String) -> String {
     raw
-        .replacingOccurrences(of: #"(?<=[!-~])[ \t]*[\r\n][ \t\r\n]*(?=[!-~])"#, with: " ", options: .regularExpression)
-        .replacingOccurrences(of: #"[ \t]*[\r\n][ \t\r\n]*"#, with: "", options: .regularExpression)
+        .replacingOccurrences(
+            of: "(?<=\(japaneseCharacterClass))[ \\t]*[\\r\\n][ \\t\\r\\n]*(?=\(japaneseCharacterClass))",
+            with: "",
+            options: .regularExpression
+        )
+        .replacingOccurrences(of: #"[ \t]*[\r\n][ \t\r\n]*"#, with: " ", options: .regularExpression)
         .replacingOccurrences(of: "[ \t]+", with: " ", options: .regularExpression)
         .split(separator: blockBreak, omittingEmptySubsequences: false)
         .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " ")) }

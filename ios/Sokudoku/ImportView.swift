@@ -41,6 +41,8 @@ struct ImportView: View {
                 Button("ファイル", systemImage: "folder") {
                     isImportingFile = true
                 }
+                // 取り出し中に別の EPUB を選ぶと、後から終わった前の本が章の一覧を上書きするため、終わるまで選ばせない
+                .disabled(isOpeningBook)
                 Button("見本", systemImage: "text.book.closed") {
                     text = sampleText
                 }
