@@ -1,4 +1,4 @@
-# sokudoku の iOS アプリの Xcode プロジェクト定義。Sokudoku.xcodeproj はこのファイルから xcodegen で生成し、リポジトリには入れない (make ios-project)
+# sokudoku の iOS アプリの Xcode プロジェクト定義。Sokudoku.xcodeproj と各 target の Info.plist はこのファイルから xcodegen で生成し、リポジトリには入れない (make ios-project)
 name: Sokudoku
 options:
   bundleIdPrefix: com.bannzai
@@ -9,13 +9,31 @@ options:
 packages:
   SokudokuCore:
     path: SokudokuCore
+# アプリと共有の拡張で揃える必要がある設定 (拡張の版はアプリの版と同じでないと Xcode が警告する)
+settings:
+  base:
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    SWIFT_VERSION: 5.0
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Automatic
 targets:
   Sokudoku:
     type: application
     platform: iOS
-    sources: [Sokudoku]
+    sources: [Sokudoku, Shared]
     dependencies:
       - package: SokudokuCore
+      - target: SokudokuShare
+    info:
+      path: Sokudoku/Info.plist
+      properties:
+        # 共有の拡張からアプリを開く URL (Shared/SharedImport.swift の sharedImportURLScheme)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.bannzai.sokudoku.import
+            CFBundleURLSchemes: [sokudoku]
+        # URL からの取り込みに使う Worker (worker/) のオリジン。空のビルドでは URL の入口を出さない
+        SokudokuExtractURL: $(SOKUDOKU_EXTRACT_URL)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku
@@ -24,8 +42,28 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
-        MARKETING_VERSION: 0.1.0
-        CURRENT_PROJECT_VERSION: 1
-        SWIFT_VERSION: 5.0
-        TARGETED_DEVICE_FAMILY: "1,2"
-        CODE_SIGN_STYLE: Automatic
+        # Worker はまだ配信の URL が決まっていない (deploy-worker.yml は Cloudflare の Secrets の登録待ち) ため空にする。
+        # make build-ios SOKUDOKU_EXTRACT_URL=<Worker のオリジン> で渡せる (Web 版の NEXT_PUBLIC_EXTRACT_URL と同じ扱い)
+        SOKUDOKU_EXTRACT_URL: ""
+  SokudokuShare:
+    type: app-extension
+    platform: iOS
+    sources: [ShareExtension, Shared]
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: sokudoku
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # Safari 等のページの URL 1 つか、選択した文字列を受ける
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku.share
+        GENERATE_INFOPLIST_FILE: YES
+        # 拡張からアプリを開く UIApplication.open は拡張では使えない API のため、拡張用の API だけに絞る検査を外す (ShareViewController.swift)
+        APPLICATION_EXTENSION_API_ONLY: NO
