@@ -65,5 +65,3 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku.share
         GENERATE_INFOPLIST_FILE: YES
-        # 拡張からアプリを開く UIApplication.open は拡張では使えない API のため、拡張用の API だけに絞る検査を外す (ShareViewController.swift)
-        APPLICATION_EXTENSION_API_ONLY: NO

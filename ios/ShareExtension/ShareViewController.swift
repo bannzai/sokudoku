@@ -32,13 +32,15 @@ final class ShareViewController: UIViewController {
     }
 
     /// 拡張を含むアプリを url で開く。共有の拡張には extensionContext.open が使えず (Today の拡張・iMessage の拡張だけが対象)、
-    /// UIApplication.shared も参照できないため、responder の連なりを辿って UIApplication に開かせる。
-    /// UIApplication.open を拡張から呼ぶため、この target は APPLICATION_EXTENSION_API_ONLY を NO にしている (ios/project.yml)
+    /// UIApplication.shared・UIApplication.open も拡張では使えない API のため、responder の連なりを辿って見つけた UIApplication の
+    /// openURL:options:completionHandler: を Objective-C の実行時に呼ぶ (Xcode は拡張の APPLICATION_EXTENSION_API_ONLY を NO にするとビルドを止める)
     private func openContainingApp(url: URL) {
+        typealias OpenURLFunction = @convention(c) (AnyObject, Selector, NSURL, NSDictionary, (@convention(block) (Bool) -> Void)?) -> Void
+        let openURLSelector = NSSelectorFromString("openURL:options:completionHandler:")
         var responder: UIResponder? = self
         while let currentResponder = responder {
-            if let application = currentResponder as? UIApplication {
-                application.open(url)
+            if let application = currentResponder as? UIApplication, application.responds(to: openURLSelector) {
+                unsafeBitCast(application.method(for: openURLSelector), to: OpenURLFunction.self)(application, openURLSelector, url as NSURL, [:], nil)
                 return
             }
             responder = currentResponder.next
