@@ -24,8 +24,18 @@ final class ShareViewController: UIViewController {
             }
         }
         for attachment in attachments where attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-            if let text = try? await attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier) as? String {
+            // loadItem は共有元が登録した型に近い形で返し String とは限らないため、UTF-8 の Data と NSAttributedString も受ける
+            switch try? await attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier) {
+            case let text as String:
                 return .text(text)
+            case let attributedText as NSAttributedString:
+                return .text(attributedText.string)
+            case let data as Data:
+                if let text = String(data: data, encoding: .utf8) {
+                    return .text(text)
+                }
+            default:
+                break
             }
         }
         return nil

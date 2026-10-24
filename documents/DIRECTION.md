@@ -62,8 +62,8 @@ agent が作ったモック (`documents/design/mock-2026-10-01/index.html`。方
 | 2026-10-05 | URL の構成 (#36) | / をリーダーにし、LP は /about/ へ。/read/ は / へ移す薄いページとして残す。basePath /sokudoku は変えない | bannzai |
 | 2026-10-06 | 読了の表示 (#38) | 読了しても別の読了画面へ切り替えず、リーダー画面で最後の単位を出したまま止め、上部の状態表示を「読了」にして今回の読んだ時間・量・実効速度を出す。判定基準の記録の表は開閉できる「これまでの記録」に入れる。読了後の再生・移動・全文のクリックは、読んだ量と再生時間を捨てた読み直しとして始める。「別の本文を読む」は再生中も含めて常に出す | bannzai (要望) / agent (細部) |
 | 2026-10-18 | iOS アプリ | 商用配布を見据えて iOS ネイティブアプリを作る。まずローカルファースト (本文の区切り・再生・保存を端末内で完結) にする | bannzai |
-| 2026-10-25 | iOS の共有シートと URL からの取り込み (#54) | Worker のオリジンを渡さないビルドでは URL の入口を出さず、共有された URL には「このビルドは URL からの取り込みに対応していません」を出す。共有シートで受けた URL は Web の URL 取り込みと同じく取得に成功したらリーダーを開き、文字列は取り込み画面の入力欄に入れる。読んでいる途中に共有を受けたら取り込み画面に戻す。URL と文字列の両方が来たら URL を使う (`documents/adr/0006-ios-native-app-with-on-device-mecab.md`) | agent |
 | 2026-10-18 | iOS アプリ | SwiftUI で `ios/` に置き、日本語の文節は端末内の MeCab (Mecab-Swift + IPADic) の品詞で組み立てる。Foundation Models は本文を改変するため使わない (`documents/adr/0006-ios-native-app-with-on-device-mecab.md`) | agent (方式) / bannzai (Foundation Models の見送り) |
+| 2026-10-25 | iOS の共有シートと URL からの取り込み (#54) | Worker のオリジンを渡さないビルドでは URL の入口を出さず、共有された URL には「このビルドは URL からの取り込みに対応していません」を出す。共有シートで受けた URL は Web の URL 取り込みと同じく取得に成功したらリーダーを開き、文字列は取り込み画面の入力欄に入れる。読んでいる途中に共有を受けたら取り込み画面に戻す。URL と文字列の両方が来たら URL を使う (`documents/adr/0006-ios-native-app-with-on-device-mecab.md`) | agent |
 
 ## agent に任せること
 
