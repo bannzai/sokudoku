@@ -17,6 +17,6 @@ describe("renderLegalDocument", () => {
   it("プライバシーポリシーに iOS アプリの本文の扱いが載る", async () => {
     const html = await renderLegalDocument("privacy");
     expect(html).toContain("<h3>iOS アプリ</h3>");
-    expect(html).toContain("提供者は、iOS アプリの利用に伴って利用者情報を収集しません");
+    expect(html).toContain("iOS アプリから提供者へ利用者情報が送信されることはありません");
   });
 });

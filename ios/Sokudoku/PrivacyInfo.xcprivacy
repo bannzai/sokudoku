@@ -18,6 +18,16 @@
 				<string>CA92.1</string>
 			</array>
 		</dict>
+		<!-- 依存の Mecab-Swift が同梱する MeCab (mecab/src/mmap.h) が、アプリに含めた辞書のファイルを開く時に fstat で大きさを読む。
+		     fstat は Apple の File timestamp APIs の一覧に入っており、C617.1 はアプリの container 内のファイルのメタデータを読む理由 -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

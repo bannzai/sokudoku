@@ -15,7 +15,7 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 - iOS アプリは、読込テキストそのものを、ユーザーの端末にも保存しません
 - iOS アプリは、表示速度の設定（日本語の 1 分あたりの文字数、英語の 1 分あたりの単語数）と、読込テキストごとの読書の位置を、ユーザーの端末のアプリの保存領域に保存します。読込テキストの識別には、読込テキストから計算したハッシュ値（SHA-256）を使います。これらの情報は提供者へ送信されず、iOS アプリを端末から削除すると端末から消去されます。ユーザーが端末のバックアップ（iCloud バックアップ等）を作成した場合は、これらの情報もバックアップに含まれることがあります
   <!-- source: https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html の Table 1-3 の Library/Preferences: app-specific preference files を置く場所で、NSUserDefaults を使うよう書かれており、"In iOS, the contents of this directory are backed up by iTunes and iCloud." とある。ios/Sokudoku/ReaderModel.swift は速度と位置を UserDefaults に保存する -->
-- iOS アプリは、アクセス解析・広告・クラッシュの報告のための情報を送信する機能を含みません。提供者は、iOS アプリの利用に伴って利用者情報を収集しません。ただし、ユーザーが端末の設定（「設定」>「プライバシーとセキュリティ」>「解析と改善」>「アプリデベロッパと共有」）で共有を許可している場合、Apple Inc. が端末から集めたクラッシュの情報とアプリの使用状況の統計を、Apple Inc. の仕組みを通じて提供者が受け取ることがあります。この取扱いは Apple Inc. のプライバシーポリシー（ https://www.apple.com/legal/privacy/data/ja/app-analytics/ ）によります
+- iOS アプリは、アクセス解析・広告・クラッシュの報告のための情報を送信する機能を含みません。iOS アプリから提供者へ利用者情報が送信されることはありません。ただし、ユーザーが端末の設定（「設定」>「プライバシーとセキュリティ」>「解析と改善」>「アプリデベロッパと共有」）で共有を許可している場合、Apple Inc. が端末から集めたクラッシュの情報とアプリの使用状況の統計を、Apple Inc. の仕組みを通じて提供者が受け取ることがあります。この取扱いは Apple Inc. のプライバシーポリシー（ https://www.apple.com/legal/privacy/data/ja/app-analytics/ ）によります
   <!-- source: https://www.apple.com/legal/privacy/data/en/app-analytics/ : "You can choose not to share crash data and statistics about how you use apps with third-party app developers. To do so, go to Settings > Privacy & Security > Analytics & Improvements, and turn off Share With App Developers." 日本語版 ( https://www.apple.com/legal/privacy/data/ja/app-analytics/ ) の表記は「“設定”＞“プライバシーとセキュリティ”＞“解析と改善”に移動して、“アプリデベロッパと共有”をオフにします」 -->
 - 現在の iOS アプリには、URL からの取り込みの機能はありません
 
@@ -87,6 +87,7 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 | Cloudflare, Inc.（Cloudflare Web Analytics） | アクセス解析 | https://www.cloudflare.com/privacypolicy/ |
 | Cloudflare, Inc.（Cloudflare Workers） | URL からの取り込み（取得サーバーの運用） | https://www.cloudflare.com/privacypolicy/ |
 | Google LLC（Google Chrome の Translator API） | 英文の日本語訳（ユーザーの端末上で実行） | https://policies.google.com/privacy |
+| Apple Inc.（App Store・App Store Connect） | iOS アプリの配信、ならびにユーザーが共有を許可した場合のクラッシュの情報とアプリの使用状況の統計の受け取り | https://www.apple.com/legal/privacy/data/ja/app-analytics/ |
 
 ## 外国にある第三者への提供
 前項の各事業者はいずれも日本国外（米国）に所在しており、これらのサービスの利用に伴い、利用者情報が日本国外のサーバーに保存されることがあります。提供者は、これらの事業者が公表する個人情報の保護に関する方針および契約条件を確認したうえで利用します。
