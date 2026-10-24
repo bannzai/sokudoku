@@ -21,6 +21,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: sokudoku
+        # 通信も暗号化も使わないため、アップロードのたびに App Store Connect で輸出コンプライアンスを回答しなくて済むよう申告しておく
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
