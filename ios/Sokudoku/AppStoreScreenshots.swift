@@ -54,10 +54,10 @@ struct AppStoreScreenshotPage: View {
         case 3:
             AppStoreScreenshotReader(source: readingSample(language: language.other), unitText: playingUnitText(language: language.other), isPlaying: true)
         default:
-            NavigationStack {
-                ImportView(open: { _ in })
-            }
-            .tint(Palette.accent)
+            // NavigationStack に入れると、縮めた枠の中で大きい見出しが左端に詰まって本番と違う見た目になる (2026-10-25 に iOS 27 のシミュレータで観測) ため、
+            // 見出し (アプリ名) を出さずに取り込み画面の本体だけを出す
+            ImportView(open: { _ in })
+                .tint(Palette.accent)
         }
     }
 
@@ -131,8 +131,6 @@ private struct AppStoreScreenshotReader: View {
 }
 
 /// 端末の枠。中身を画面全体と同じ大きさ・位置で組み立て、scale 倍に縮めて画面の下寄りに出す。
-/// 中身を画面からずらして組み立てると、ナビゲーションバーの大きい見出しが左端に詰まる (2026-10-25 に iOS 26 のシミュレータで観測) ため、
-/// 組み立てる位置は画面に合わせ、縮小と移動は見た目だけの scaleEffect で行う。
 private struct AppStoreScreenshotDeviceFrame<Content: View>: View {
     let screenSize: CGSize
     let scale: CGFloat
@@ -148,18 +146,19 @@ private struct AppStoreScreenshotDeviceFrame<Content: View>: View {
         let anchorY = (screenSize.height * 0.985 - (screenSize.height + bezel) * scale) / (screenSize.height * (1 - scale))
         content
             // 枠の中は上端がステータスバーの位置に当たらないため、ステータスバーの高さぶんの余白を取る。
-            // 角の丸みより小さいと、中身の上端の角が丸みの外にはみ出して段になる (2026-10-25 にスクリーンショットで観測) ため、丸みより大きくする
+            // 中身のナビゲーションバーは角の丸みで切り抜かれず、丸みが終わるより上に来ると角に段が出る (2026-10-25 にスクリーンショットで観測) ため、
+            // 余白は角の丸みより大きくし、丸みは半径ちょうどで終わる circular にする
             .padding(.top, isPad ? 40 : 62)
             .frame(width: screenSize.width, height: screenSize.height)
             .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .circular))
             .overlay(alignment: .top) {
                 if !isPad {
                     Capsule().fill(.black).frame(width: 126, height: 37).padding(.top, 11)
                 }
             }
             .padding(bezel)
-            .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: cornerRadius + bezel, style: .continuous))
+            .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: cornerRadius + bezel, style: .circular))
             .frame(width: screenSize.width, height: screenSize.height)
             .scaleEffect(scale, anchor: UnitPoint(x: 0.5, y: anchorY))
     }
