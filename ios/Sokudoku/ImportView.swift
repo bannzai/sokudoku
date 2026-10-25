@@ -72,6 +72,10 @@ struct ImportView: View {
             Text("文章の区切りと再生はすべてこの端末の中で行い、文章を外部へ送りません。")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            // App Store の審査ガイドライン 5.1.1(i) が、プライバシーポリシーをアプリの中からも開けることを求めるため
+            Link("プライバシーポリシー", destination: URL(string: "https://bannzai.github.io/sokudoku/privacy/")!)
+                .font(.footnote)
         }
         .padding()
         .navigationTitle("sokudoku")

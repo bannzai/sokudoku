@@ -1,0 +1,47 @@
+name: ios
+
+# ios/ の iOS アプリ (documents/adr/0006-ios-native-app-with-on-device-mecab.md) のテストとビルドを、ローカル Mac の代わりに macOS runner で確かめる。
+# Web だけの変更で macOS runner を動かさないよう ios/ の変更に絞る。この workflow 自体の変更も、変更した PR で動作を確かめるため含める
+on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    # public リポジトリでは macOS runner を無料で使える。iOS Simulator の SDK と Xcode が入った GitHub 管理の最新の image を使う
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # テストとビルドが依存のコードを実行するため、後続の step へ checkout のトークンを残さない。この job は git の操作をしない
+        with:
+          persist-credentials: false
+
+      # make build-ios が ios/project.yml から Xcode プロジェクトを生成するために使う
+      - run: brew install xcodegen
+
+      # ios/SokudokuCore/.build はビルド成果物も含み、別の版の Swift でビルドしたものを復元すると失敗するため、キャッシュのキーに Xcode の版を入れる
+      - id: xcode
+        run: echo "version=$(xcodebuild -version | head -n 1 | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+
+      # Mecab-Swift (IPADic の辞書を含む) の取得に時間がかかるため、swift test と xcodebuild がそれぞれ取得した依存を残す。
+      # 依存の版は Package.resolved で決まるため、その内容か Xcode の版が変わった時だけ作り直す
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ios/SokudokuCore/.build
+            ios/build/SourcePackages
+          key: ios-spm-${{ runner.os }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('ios/SokudokuCore/Package.resolved') }}
+
+      - run: make test-ios
+      - run: make build-ios
