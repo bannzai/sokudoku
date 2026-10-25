@@ -184,16 +184,24 @@ struct ImportView: View {
     }
 
     /// EPUB のファイルの中身から章を取り出し、章の一覧を開く。DRM 付きなど読めない時は理由を画面に出す。
+    /// 取り出しを待つ間に別の取り込み操作 (共有シートからの受け取り・URL からの取り込み・本文の入力) があれば、この結果は捨てる。
     private func openEpub(data: Data) {
+        latestImportRequestID += 1
+        let importRequestID = latestImportRequestID
         isOpeningBook = true
         Task {
             defer { isOpeningBook = false }
-            do {
-                // 章の数だけ XHTML を解析するため、長い本でも画面を止めないように別のスレッドで行う
-                openBook(try await Task.detached(priority: .userInitiated) { try epubBook(data: data) }.value)
-            } catch EpubError.drmProtected {
-                importFailureMessage = EpubError.drmProtected.localizedDescription
-            } catch {
+            // 章の数だけ XHTML を解析するため、長い本でも画面を止めないように別のスレッドで行う
+            let result = await Task.detached(priority: .userInitiated) { Result { try epubBook(data: data) } }.value
+            guard importRequestID == latestImportRequestID else {
+                return
+            }
+            switch result {
+            case .success(let book):
+                openBook(book)
+            case .failure(let error as EpubError) where error == .drmProtected:
+                importFailureMessage = error.localizedDescription
+            case .failure(let error):
                 importFailureMessage = "EPUB を読み込めませんでした: \(error.localizedDescription)"
             }
         }
