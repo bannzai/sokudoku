@@ -56,7 +56,7 @@ struct AppStoreScreenshotPage: View {
         default:
             // NavigationStack に入れると、縮めた枠の中で大きい見出しが左端に詰まって本番と違う見た目になる (2026-10-25 に iOS 27 のシミュレータで観測) ため、
             // 見出し (アプリ名) を出さずに取り込み画面の本体だけを出す
-            ImportView(pendingSharedImport: .constant(nil), open: { _ in })
+            ImportView(pendingSharedImport: .constant(nil), open: { _ in }, openBook: { _ in })
                 .tint(Palette.accent)
                 .task {
                     markAppStoreScreenshotReady()
@@ -113,7 +113,8 @@ private struct AppStoreScreenshotReader: View {
     var body: some View {
         NavigationStack {
             if let reader {
-                ReaderView(reader: reader, close: {})
+                // 貼り付けた本文を読む時と同じ戻るボタンの文言にする (RootView で EPUB を開いていない時の文言)
+                ReaderView(reader: reader, closeTitle: "別の文章", close: {})
             }
         }
         .tint(Palette.accent)
