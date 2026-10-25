@@ -124,9 +124,10 @@ struct ImportView: View {
             }
             pendingSharedImport = nil
             importFailureMessage = nil
+            // 共有を受けたら、取り出し中の EPUB・取得中の URL の結果で画面を移さない (URL からの取り込みが無いビルドで URL を受けた時も同じ)
+            latestImportRequestID += 1
             switch sharedImport {
             case .text(let sharedText):
-                latestImportRequestID += 1
                 text = sharedText
             case .pageURL(let pageURL):
                 pageURLInput = pageURL
