@@ -17,6 +17,8 @@ settings:
     SWIFT_VERSION: 5.0
     TARGETED_DEVICE_FAMILY: "1,2"
     CODE_SIGN_STYLE: Automatic
+    # bannzai の Apple Developer Program のチーム。実機向けのビルド (fastlane beta) で、アプリと共有の拡張の両方の自動署名に使う
+    DEVELOPMENT_TEAM: TQPN82UBBY
 targets:
   Sokudoku:
     type: application
@@ -39,12 +41,15 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: sokudoku
+        # 通信も暗号化も使わないため、アップロードのたびに App Store Connect で輸出コンプライアンスを回答しなくて済むよう申告しておく
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         # Worker はまだ配信の URL が決まっていない (deploy-worker.yml は Cloudflare の Secrets の登録待ち) ため空にする。
         # make build-ios SOKUDOKU_EXTRACT_URL=<Worker のオリジン> で渡せる (Web 版の NEXT_PUBLIC_EXTRACT_URL と同じ扱い)
         SOKUDOKU_EXTRACT_URL: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   SokudokuShare:
     type: app-extension
     platform: iOS

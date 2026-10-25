@@ -83,6 +83,15 @@ final class ReaderModel {
         move(to: index + delta)
     }
 
+    #if DEBUG
+    /// App Store のスクリーンショット (AppStoreScreenshots.swift) で再生中の画面を撮るため、単位を進めずに再生中の表示にする。
+    /// 実際に再生すると単位が表示時間ごとに進み、撮る瞬間の単位が決まらないため、再生の処理は始めない。
+    func showPlayingWithoutAdvancing(unitIndex: Int) {
+        step(by: unitIndex - index)
+        isPlaying = true
+    }
+    #endif
+
     func changeSpeed(language: Language, by stepDelta: Int) {
         speed = speed.stepped(language: language, by: stepDelta)
         remainingDurationsByIndex = remainingDurations(units: units, speed: speed)

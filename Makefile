@@ -34,7 +34,7 @@ check: lint build-web typecheck test typecheck-worker test-worker
 IOS_DERIVED_DATA := ios/build
 IOS_APP := $(IOS_DERIVED_DATA)/Build/Products/Debug-iphonesimulator/Sokudoku.app
 
-.PHONY: ios-project test-ios build-ios ios
+.PHONY: ios-project test-ios build-ios ios screenshots-ios
 ios-project:
 	cd ios && xcodegen generate
 
@@ -51,6 +51,10 @@ ios: build-ios
 	sim-boot
 	xcrun simctl install "$$(sim-id)" $(IOS_APP)
 	xcrun simctl launch "$$(sim-id)" com.bannzai.sokudoku
+
+# App Store のスクリーンショットを撮り、ios/fastlane/screenshots/ に置く (ios/scripts/appstore-screenshots.sh)
+screenshots-ios:
+	bash ios/scripts/appstore-screenshots.sh
 
 # 引数なしの make で web を実行する (人が手で動作確認するための入口。検査・テストは CI が行う)
 .DEFAULT_GOAL := web

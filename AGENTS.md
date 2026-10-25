@@ -15,13 +15,13 @@ main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ
 
 ## 検証方法
 
-ビルド・テスト・ブラウザでの動作確認は外部マシンに任せ、このマシン (ローカル Mac) の負荷を避ける。本リポジトリは public のため GitHub Actions の Linux runner を使う (private に変える場合は Devin のセッションに移す)。
+ビルド・テスト・ブラウザでの動作確認は外部マシンに任せ、このマシン (ローカル Mac) の負荷を避ける。本リポジトリは public のため GitHub Actions の Linux runner (iOS アプリは macOS runner) を使う (private に変える場合は Devin のセッションに移す)。
 
 | 対象 | 方法 |
 | --- | --- |
 | lint / 型検査 / テスト / ビルド | PR の `ci.yml` の結果で確認する (`make check` と同じコマンド)。ローカルでは CI の失敗を再現・修正する時だけ `make setup` → `make check` を実行する |
 | ブラウザでの動作確認 | webtunnel skill (`~/.claude/skills/webtunnel/SKILL.md`) で、GitHub Actions runner 上の Chromium と dev サーバ (`browser-session.yml`) を開く。`WEBTUNNEL_REPO=bannzai/sokudoku` と `--ref <ブランチ>` で PR のコードを開き、dev サーバの URL は http://127.0.0.1:3000/sokudoku/ 。UI の変更はスクリーンショットを Read して目視確認してから完了報告する (HTTP 200 やビルド成功で表示を判断しない)。ローカルの agent-browser は runner から再現できない時だけ使い、理由を PR に書く |
-| iOS アプリ | CI の job が無いため、ローカルで `make test-ios` (SokudokuCore の `swift test`) と `make build-ios` を実行する。画面の確認は ios-simulator skill (`~/.claude/skills/ios-simulator/SKILL.md`) に従い、`make ios` でプロジェクト固有のシミュレータに入れて起動し、スクリーンショットで確かめる |
+| iOS アプリ | `make test-ios` (SokudokuCore の `swift test`) と `make build-ios` は、`ios/` を変えた PR で macOS runner が実行する `ios.yml` の結果で確認する。ローカルでは CI の失敗を再現・修正する時だけ実行する。画面の確認は ios-simulator skill (`~/.claude/skills/ios-simulator/SKILL.md`) に従い、`make ios` でプロジェクト固有のシミュレータに入れて起動し、スクリーンショットで確かめる |
 | 公開後の確認 | https://bannzai.github.io/sokudoku/ を webtunnel のセッションで開く |
 | 公開後の利用状況の分析 | `/cloudflare-web-analytics-report` (設定は `.claude/cloudflare-web-analytics.json`) で Cloudflare Web Analytics の日別の訪問数・人気ページを読む |
 

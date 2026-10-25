@@ -13,3 +13,6 @@ ios/ShareExtension/Info.plist
 ios/build/
 ios/SokudokuCore/.build/
 ios/SokudokuCore/.swiftpm/
+# fastlane が実行のたびに書き出す
+ios/fastlane/README.md
+ios/fastlane/report.xml
