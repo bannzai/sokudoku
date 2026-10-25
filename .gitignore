@@ -8,6 +8,8 @@ next-env.d.ts
 .DS_Store
 # ios/project.yml から xcodegen で生成するため入れない
 ios/Sokudoku.xcodeproj/
+ios/Sokudoku/Info.plist
+ios/ShareExtension/Info.plist
 ios/build/
 ios/SokudokuCore/.build/
 ios/SokudokuCore/.swiftpm/

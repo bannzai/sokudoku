@@ -56,7 +56,7 @@ struct AppStoreScreenshotPage: View {
         default:
             // NavigationStack に入れると、縮めた枠の中で大きい見出しが左端に詰まって本番と違う見た目になる (2026-10-25 に iOS 27 のシミュレータで観測) ため、
             // 見出し (アプリ名) を出さずに取り込み画面の本体だけを出す
-            ImportView(open: { _ in }, openBook: { _ in })
+            ImportView(pendingSharedImport: .constant(nil), open: { _ in }, openBook: { _ in })
                 .tint(Palette.accent)
                 .task {
                     markAppStoreScreenshotReady()

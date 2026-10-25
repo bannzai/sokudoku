@@ -42,9 +42,9 @@ ios-project:
 test-ios:
 	swift test --package-path ios/SokudokuCore
 
-# シミュレータ向けにビルドだけを行う (署名しない)
+# シミュレータ向けにビルドだけを行う (署名しない)。SOKUDOKU_EXTRACT_URL=<Worker のオリジン> を付けると URL からの取り込みを出す (既定は ios/project.yml)
 build-ios: ios-project
-	xcodebuild -project ios/Sokudoku.xcodeproj -scheme Sokudoku -destination 'generic/platform=iOS Simulator' -derivedDataPath $(IOS_DERIVED_DATA) CODE_SIGNING_ALLOWED=NO build
+	xcodebuild -project ios/Sokudoku.xcodeproj -scheme Sokudoku -destination 'generic/platform=iOS Simulator' -derivedDataPath $(IOS_DERIVED_DATA) CODE_SIGNING_ALLOWED=NO $(if $(SOKUDOKU_EXTRACT_URL),SOKUDOKU_EXTRACT_URL=$(SOKUDOKU_EXTRACT_URL)) build
 
 # プロジェクト固有のシミュレータ (sim-boot) を起動し、ビルドしたアプリを入れて起動する
 ios: build-ios
