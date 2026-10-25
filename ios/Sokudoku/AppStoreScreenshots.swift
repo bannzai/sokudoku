@@ -58,6 +58,9 @@ struct AppStoreScreenshotPage: View {
             // 見出し (アプリ名) を出さずに取り込み画面の本体だけを出す
             ImportView(open: { _ in })
                 .tint(Palette.accent)
+                .task {
+                    markAppStoreScreenshotReady()
+                }
         }
     }
 
@@ -126,8 +129,18 @@ private struct AppStoreScreenshotReader: View {
                 reader.step(by: unitIndex - reader.index)
             }
             self.reader = reader
+            if reader.failureMessage == nil {
+                markAppStoreScreenshotReady()
+            }
         }
     }
+}
+
+/// 撮影してよい状態になったことを、撮影スクリプト (ios/scripts/appstore-screenshots.sh) に知らせる。
+/// アプリの Documents に appstore-screenshot-ready を置き、スクリプトはこのファイルが現れるまで待ってから撮る。
+func markAppStoreScreenshotReady() {
+    let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    try? Data().write(to: documents.appendingPathComponent("appstore-screenshot-ready"))
 }
 
 /// 端末の枠。中身を画面全体と同じ大きさ・位置で組み立て、scale 倍に縮めて画面の下寄りに出す。

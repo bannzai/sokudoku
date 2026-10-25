@@ -43,9 +43,21 @@ for entry in "${devices[@]}"; do
     mkdir -p "ios/fastlane/screenshots/$fastlane_language"
     for page in "${pages[@]}"; do
       xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
+      ready_file="$(xcrun simctl get_app_container "$udid" "$bundle_id" data)/Documents/appstore-screenshot-ready"
+      rm -f "$ready_file"
       xcrun simctl launch "$udid" "$bundle_id" -AppStoreScreenshotPage "$page" -AppStoreScreenshotLanguage "$language" >/dev/null
-      # 起動と MeCab の辞書を開いて本文を区切るのを待つ
-      sleep 5
+      # 起動して MeCab の辞書で本文を区切り終えると、アプリが ready_file を置く (AppStoreScreenshots.swift の markAppStoreScreenshotReady)。
+      # 負荷の高いマシンでも区切りは数秒で終わるため、60 秒で来なければ区切りに失敗したとみなして止める
+      for _ in $(seq 1 120); do
+        [[ -e $ready_file ]] && break
+        sleep 0.5
+      done
+      if [[ ! -e $ready_file ]]; then
+        echo "ERROR: ページ $page ($language, $device_type) の画面が 60 秒以内に撮影できる状態にならなかった" >&2
+        exit 1
+      fi
+      # ready_file を置いた直後の状態の変更が、画面に描かれるのを待つ
+      sleep 1
       out="ios/fastlane/screenshots/$fastlane_language/${page}_${device_label}.png"
       xcrun simctl io "$udid" screenshot --type=png "$out" >/dev/null
       swift ios/scripts/flatten-png.swift "$out"
