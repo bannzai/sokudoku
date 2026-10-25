@@ -20,7 +20,7 @@ Accepted
 - 本文は端末の外へ送らず、端末にも保存しない。読書位置は本文の SHA-256 をキーに、速度と一緒に UserDefaults へ保存する (Web 版の readerStorage.ts と同じ方針)
 - ADR 0002 の制約 (中央揃え・単色、再生中に全文を出さない、固有名詞で表示時間を延ばさない、DRM 付き書籍を取り込まない) は iOS 版にもそのまま適用する
 - 例外: URL からの取り込み (取り込み画面の URL の入力と、共有シートから受けたページの URL) だけは、ページの URL を Web 版と同じ Worker (ADR 0004) の `GET /extract?url=<URL>` へ送り、返ってきた本文を読む。送るのはページの URL だけで、貼り付けた本文・ファイルの本文・読書位置は送らない。リクエストの組み立てとレスポンスの解釈は `ios/SokudokuCore/Sources/SokudokuCore/URLImport.swift` に置き、Web 版の `src/lib/urlImport.ts` と同じ規則にする (Cookie・キャッシュを使わず、20 秒で打ち切る)
-- Worker のオリジンはビルド設定 `SOKUDOKU_EXTRACT_URL` (`ios/project.yml`、`make build-ios SOKUDOKU_EXTRACT_URL=<オリジン>` で上書き) で渡し、空のビルドでは URL の入口を出さない (Web 版の `NEXT_PUBLIC_EXTRACT_URL` と同じ扱い)
+- Worker のオリジンはビルド設定 `SOKUDOKU_EXTRACT_URL` (`ios/project.yml`、`make build-ios SOKUDOKU_EXTRACT_URL=<オリジン>` で上書き) で渡し、空のビルドでは URL の入口を出さない (Web 版の `NEXT_PUBLIC_EXTRACT_URL` と同じ扱い)。プライバシーポリシー (`content/legal/privacy.md`) の iOS アプリの項は空のビルドに合わせて書いてあるため、オリジンを渡したビルドを配る時は同じ変更でポリシーの iOS アプリの項も直す
 - 共有シートの拡張 (`ios/ShareExtension`) は、受けたページの URL か文字列を `sokudoku://import?url=...` / `?text=...` にしてアプリを開き、拡張の中では取得も保存もしない。文字列がこの URL の query に入るが、URL は端末の中のアプリ間の受け渡しにだけ使い、端末の外へは送らない。App Group で受け渡さないのは、署名しないシミュレータ向けのビルド (`make build-ios` の `CODE_SIGNING_ALLOWED=NO`) では entitlement が付かず共有の領域を使えないため
 
 ## Consequences

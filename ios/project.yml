@@ -41,7 +41,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.bannzai.sokudoku
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: sokudoku
-        # 通信も暗号化も使わないため、アップロードのたびに App Store Connect で輸出コンプライアンスを回答しなくて済むよう申告しておく
+        # 独自の暗号化を使わないため、アップロードのたびに App Store Connect で輸出コンプライアンスを回答しなくて済むよう申告しておく。
+        # 通信は SOKUDOKU_EXTRACT_URL を渡したビルドの URL からの取り込みだけで、OS の HTTPS (URLSession) を使う
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait

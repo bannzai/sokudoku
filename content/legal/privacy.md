@@ -10,7 +10,7 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 本サービスは、ブラウザで利用する Web サイト（以下「Web 版」といいます。）と、iPhone・iPad で利用するアプリ（以下「iOS アプリ」といいます。）で提供します。次の「iOS アプリ」の項は iOS アプリについての記載で、それより後の「ユーザーが読み込む文章」から「Cookie 等」までの各項は、「ユーザーがお問い合わせで送信する情報」の項が Web 版と iOS アプリの両方についての記載で、それ以外の項が Web 版についての記載です。
 
 ### iOS アプリ
-<!-- source: ios/Sokudoku/ImportView.swift: 取り込みは貼り付け・端末のテキストファイル・見本の本文だけで、URL からの取り込みは無い。ios/Sokudoku/ReaderModel.swift: UserDefaults に保存するのは速度 (readingSpeed) と本文の SHA-256 をキーにした読書の位置 (readingPositions) だけ。ios/ に URLSession 等の通信の処理は無い -->
+<!-- source: ios/Sokudoku/ImportView.swift: 取り込みは貼り付け・端末のテキストファイル・見本の本文・共有シートの文字列で、どれも端末の中で処理する。URL からの取り込み (ios/SokudokuCore/Sources/SokudokuCore/URLImport.swift の URLSession) は Info.plist の SokudokuExtractURL が空でない時だけ出し、ios/project.yml の SOKUDOKU_EXTRACT_URL は空のため、配信するビルドには URL からの取り込みも通信も無い。ios/Sokudoku/ReaderModel.swift: UserDefaults に保存するのは速度 (readingSpeed) と本文の SHA-256 をキーにした読書の位置 (readingPositions) だけ -->
 - iOS アプリは、ユーザーが貼り付け、またはファイルとして読み込ませた文章（以下、この項において「読込テキスト」といいます。）を、ユーザーの端末の中でのみ処理し（文節への区切りには、アプリに含まれる辞書を端末の中で使います）、提供者のサーバーその他の外部へ送信しません。提供者は、読込テキストを取得、閲覧、保存しません
 - iOS アプリは、読込テキストそのものを、ユーザーの端末にも保存しません
 - iOS アプリは、表示速度の設定（日本語の 1 分あたりの文字数、英語の 1 分あたりの単語数）と、読込テキストごとの読書の位置を、ユーザーの端末のアプリの保存領域に保存します。読込テキストの識別には、読込テキストから計算したハッシュ値（SHA-256）を使います。これらの情報は提供者へ送信されず、iOS アプリを端末から削除すると端末から消去されます。ユーザーが端末のバックアップ（iCloud バックアップ等）を作成した場合は、これらの情報もバックアップに含まれることがあります
@@ -18,6 +18,7 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 - iOS アプリは、アクセス解析・広告・クラッシュの報告のための情報を送信する機能を含みません。iOS アプリから提供者へ利用者情報が送信されることはありません。ただし、ユーザーが端末の設定（「設定」>「プライバシーとセキュリティ」>「解析と改善」>「アプリデベロッパと共有」）で共有を許可している場合、Apple Inc. が端末から集めたクラッシュの情報とアプリの使用状況の統計を、Apple Inc. の仕組みを通じて提供者が受け取ることがあります。この取扱いは Apple Inc. のプライバシーポリシー（ https://www.apple.com/legal/privacy/data/ja/app-analytics/ ）によります
   <!-- source: https://www.apple.com/legal/privacy/data/en/app-analytics/ : "You can choose not to share crash data and statistics about how you use apps with third-party app developers. To do so, go to Settings > Privacy & Security > Analytics & Improvements, and turn off Share With App Developers." 日本語版 ( https://www.apple.com/legal/privacy/data/ja/app-analytics/ ) の表記は「“設定”＞“プライバシーとセキュリティ”＞“解析と改善”に移動して、“アプリデベロッパと共有”をオフにします」 -->
 - 現在の iOS アプリには、URL からの取り込みの機能はありません
+  <!-- iOS アプリのビルドに SOKUDOKU_EXTRACT_URL (Worker のオリジン) を渡して URL からの取り込みを出す時は、この項と「URL からの取り込み」の項を iOS アプリにも当てはまるよう直す (documents/adr/0006-ios-native-app-with-on-device-mecab.md) -->
 
 ### ユーザーが読み込む文章
 ユーザーが本サービスに貼り付け、またはファイルとして読み込ませた文章（以下「読込テキスト」といいます。）は、ユーザーの端末のブラウザ内でのみ処理され、提供者のサーバーその他の外部へ送信されません。提供者は、読込テキストを取得、閲覧、保存しません。
