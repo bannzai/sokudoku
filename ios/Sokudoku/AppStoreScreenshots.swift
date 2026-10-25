@@ -122,16 +122,19 @@ private struct AppStoreScreenshotReader: View {
             while reader.segmented == nil, reader.failureMessage == nil {
                 try? await Task.sleep(for: .milliseconds(100))
             }
-            let unitIndex = reader.units.firstIndex { $0.text.contains(unitText) } ?? 0
+            // 区切りに失敗した時と、辞書・本文の変更で出しておく単位が見つからない時は、意図と違うコマを撮らないよう準備完了を知らせない
+            // (撮影スクリプトが待ちきれずに失敗する)
+            guard reader.failureMessage == nil, let unitIndex = reader.units.firstIndex(where: { $0.text.contains(unitText) }) else {
+                self.reader = reader
+                return
+            }
             if isPlaying {
                 reader.showPlayingWithoutAdvancing(unitIndex: unitIndex)
             } else {
                 reader.step(by: unitIndex - reader.index)
             }
             self.reader = reader
-            if reader.failureMessage == nil {
-                markAppStoreScreenshotReady()
-            }
+            markAppStoreScreenshotReady()
         }
     }
 }
