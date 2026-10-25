@@ -11,7 +11,7 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 
 ### iOS アプリ
 <!-- source: ios/Sokudoku/ImportView.swift: 取り込みは貼り付け・端末のテキストファイル・見本の本文・共有シートの文字列で、どれも端末の中で処理する。URL からの取り込み (ios/SokudokuCore/Sources/SokudokuCore/URLImport.swift の URLSession) は Info.plist の SokudokuExtractURL が空でない時だけ出し、ios/project.yml の SOKUDOKU_EXTRACT_URL は空のため、配信するビルドには URL からの取り込みも通信も無い。ios/Sokudoku/ReaderModel.swift: UserDefaults に保存するのは速度 (readingSpeed) と本文の SHA-256 をキーにした読書の位置 (readingPositions) だけ -->
-- iOS アプリは、ユーザーが貼り付け、またはファイルとして読み込ませた文章（以下、この項において「読込テキスト」といいます。）を、ユーザーの端末の中でのみ処理し（文節への区切りには、アプリに含まれる辞書を端末の中で使います）、提供者のサーバーその他の外部へ送信しません。提供者は、読込テキストを取得、閲覧、保存しません
+- iOS アプリは、ユーザーが貼り付け、ファイルとして読み込ませ、または他のアプリから共有した文章（以下、この項において「読込テキスト」といいます。）を、ユーザーの端末の中でのみ処理し（文節への区切りには、アプリに含まれる辞書を端末の中で使います）、提供者のサーバーその他の外部へ送信しません。提供者は、読込テキストを取得、閲覧、保存しません
 - iOS アプリは、読込テキストそのものを、ユーザーの端末にも保存しません
 - iOS アプリは、表示速度の設定（日本語の 1 分あたりの文字数、英語の 1 分あたりの単語数）と、読込テキストごとの読書の位置を、ユーザーの端末のアプリの保存領域に保存します。読込テキストの識別には、読込テキストから計算したハッシュ値（SHA-256）を使います。これらの情報は提供者へ送信されず、iOS アプリを端末から削除すると端末から消去されます。ユーザーが端末のバックアップ（iCloud バックアップ等）を作成した場合は、これらの情報もバックアップに含まれることがあります
   <!-- source: https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html の Table 1-3 の Library/Preferences: app-specific preference files を置く場所で、NSUserDefaults を使うよう書かれており、"In iOS, the contents of this directory are backed up by iTunes and iCloud." とある。ios/Sokudoku/ReaderModel.swift は速度と位置を UserDefaults に保存する -->

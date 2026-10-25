@@ -27,7 +27,7 @@ Accepted
 - アプリの大きさは IPADic の辞書を含めて約 57 MB (2026-10-18 のシミュレータ向け Debug ビルドの `Sokudoku.app` を `du -sh` で計測)
 - Mecab-Swift の公開 API は品詞を 8 種類に丸めて返すため、読みと原形の列の位置に読み出したい素性の列を指定する辞書の定義 (`IPADicFeatureColumns`) で品詞細分類と原形を取り出している。Mecab-Swift の版を上げる時は `TextSegmenter.swift` のテストで区切りが変わらないことを確かめる
 - IPADic は古い辞書で、「いた事」を 1 語の名詞として持つなど、文節が不自然に切れる箇所が残る (`TextSegmenterTests` のコメント)。UniDic・Sudachi への置き換えは、区切りの崩れが読みの妨げになると分かった時に別の ADR で判断する
-- iOS のビルド・テストを行う CI の job はまだ無く、ローカルの `make test-ios`・`make build-ios` で確かめる
+- iOS のビルド・テストは `.github/workflows/ios.yml` の macOS runner で `make test-ios`・`make build-ios` を実行して確かめる
 - iOS アプリの URLSession は Origin を付けないため、Worker の CORS の許可元 (ADR 0004) では iOS からの呼び出しを制限できない。Origin の無い呼び出しは ADR 0004 の時点から curl 等と同じく許しており、悪用は回数の制限・User-Agent で名乗ること・取得先の検査で抑える
 - 共有の拡張から拡張を含むアプリを開く公開の API は無い。`NSExtensionContext.open(_:completionHandler:)` の説明は「In iOS, the Today and iMessage app extension points support this method.」(https://developer.apple.com/documentation/foundation/nsextensioncontext/open(_:completionhandler:) 、2026-10-25 に確認) で、共有の拡張は対象に入っていない。そのため拡張は responder の連なりで見つけた UIApplication の `openURL:options:completionHandler:` を Objective-C の実行時に呼んでいる (`ShareViewController.swift`)。2026-10-25 に iOS 27.0 のシミュレータで、Safari の共有シートから sokudoku を選ぶとアプリが開いてページが取り込まれることを確かめた。App Store の審査でこの呼び出しが問題になるかは未確認で、提出前に確かめる
 - 共有した文字列を URL の query で渡すため、アプリへ渡せる文字列の長さには URL の長さの上限がかかる。上限の値は確かめていない
