@@ -1,0 +1,15 @@
+A reader that shows Japanese and English text one word at a time (one phrase at a time for Japanese) in the same place on the screen, a style known as RSVP. You can read on at the speed you choose without moving your eyes from side to side.
+
+What you can do
+- Paste the text you want to read, or open a text file on your device (including Aozora Bunko txt files)
+- Read English one word at a time and Japanese one phrase at a time
+- Set the speed in words per minute for English and characters per minute for Japanese
+- Get a slightly longer pause at commas, at the end of sentences, and at the end of paragraphs
+- Pause to see the sentences around your place and the word you are on
+- Pick up where you left off: the app remembers your place for each text
+
+Your text stays on your device
+Splitting and playback happen entirely on this device. The app never sends your text to a server, and the developer never receives or stores it. The text itself is not saved on your device either.
+
+Please note
+The app's screens are in Japanese. Word and phrase splitting may contain mistakes. The app does not promise faster reading or better comprehension. E-books with DRM cannot be opened.

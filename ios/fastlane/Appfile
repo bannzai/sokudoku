@@ -1,0 +1,2 @@
+# ios/project.yml の PRODUCT_BUNDLE_IDENTIFIER と同じ値
+app_identifier("com.bannzai.sokudoku")
