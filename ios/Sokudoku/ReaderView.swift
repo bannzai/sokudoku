@@ -4,7 +4,9 @@ import SwiftUI
 /// リーダー画面。単位を 1 つずつ同じ位置に中央揃えで出し、停止中だけ前後の文と現在位置を出す (documents/adr/0002-avoid-patented-features-and-drm-import.md)。
 struct ReaderView: View {
     let reader: ReaderModel
-    /// 別の文章を読むために、取り込み画面へ戻る。
+    /// 戻るボタンの文言。EPUB の章を読んでいる時は章の一覧へ、それ以外は取り込み画面へ戻るため、戻り先に合わせる。
+    let closeTitle: String
+    /// 別の文章 (EPUB なら別の章) を読むために、前の画面へ戻る。
     let close: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
@@ -32,7 +34,7 @@ struct ReaderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("別の文章", systemImage: "chevron.backward") {
+                Button(closeTitle, systemImage: "chevron.backward") {
                     reader.pause()
                     close()
                 }

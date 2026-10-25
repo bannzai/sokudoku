@@ -20,6 +20,7 @@ let package = Package(
                 .product(name: "IPADic", package: "Mecab-Swift"),
             ]
         ),
-        .testTarget(name: "SokudokuCoreTests", dependencies: ["SokudokuCore"]),
+        // Fixtures の EPUB は scripts/make-epub-fixtures.sh で作る
+        .testTarget(name: "SokudokuCoreTests", dependencies: ["SokudokuCore"], resources: [.copy("Fixtures")]),
     ]
 )
