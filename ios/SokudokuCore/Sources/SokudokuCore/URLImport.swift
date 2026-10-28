@@ -38,8 +38,9 @@ private let workerExtractErrors: Set<URLImportFailure> = [
     .invalidURL, .blockedURL, .robotsDisallowed, .pageTooLarge, .pageUnavailable, .unextractable, .rateLimited,
 ]
 
-/// Worker の呼び出しの時間の上限 (秒)。Worker 自身の取得の上限 (10 秒、worker/src/index.ts) に、端末と Worker の間の通信の余裕を足した値 (Web 版と同じ)
-public let extractTimeoutSeconds: TimeInterval = 20
+/// Worker の呼び出しの時間の上限 (秒)。Worker 自身の取得の上限 (10 秒、worker/src/index.ts) と LLM に区切らせる時間の上限
+/// (10 秒、worker/src/segment.ts) に、端末と Worker の間の通信の余裕を足した値 (Web 版と同じ)
+public let extractTimeoutSeconds: TimeInterval = 30
 
 /// URL の query の値に、そのまま置いてよい文字 (RFC 3986 の unreserved)。
 /// URLComponents.queryItems は + を符号化せず、Worker の searchParams.get が + を空白として読むため、これ以外の文字はすべて符号化する

@@ -13,6 +13,8 @@ describe("TextImporter の URL からの取り込み", () => {
     expect(html).toContain('id="page-url"');
     expect(html).toContain("URL から読む");
     expect(html).toContain("ページの URL を取得用のサーバーへ送ります");
+    // 取り出した公開ページの本文が Workers AI へ渡ることを利用者に伝える (documents/adr/0005-llm-segmentation-for-url-import.md)
+    expect(html).toContain("取り出したページの本文を表示の単位に区切るため AI (Cloudflare Workers AI) に渡します");
   });
 
   it("Worker の URL が無いビルドでは URL の入口を出さない", () => {
@@ -21,5 +23,6 @@ describe("TextImporter の URL からの取り込み", () => {
     expect(html).not.toContain('id="page-url"');
     expect(html).not.toContain("URL から読む");
     expect(html).not.toContain("取得用のサーバー");
+    expect(html).not.toContain("Workers AI");
   });
 });

@@ -76,6 +76,29 @@ describe("segmentText", () => {
     expectOffsetsMatchSource(wikipediaGarlicExcerpt);
   });
 
+  it("区切りの位置のある段落はその位置で分け、区切りの位置の無い段落は BudouX で分ける", () => {
+    // 1 段落目「　吾輩は猫である。名前はまだ無い。」を「吾輩は猫である。/ 名前は / まだ無い。」に区切った位置
+    const { sentences, units } = segmentText(aozoraExcerpt, [[9, 12], null]);
+    const budouxUnits = segmentText(aozoraExcerpt).units;
+    expect(units.slice(0, 3).map((unit) => unit.text)).toEqual(["吾輩は猫である。", "名前は", "まだ無い。"]);
+    expect(units.slice(0, 3).map((unit) => unit.pause)).toEqual(["sentence", "none", "paragraph"]);
+    expect(units.slice(3)).toEqual(budouxUnits.slice(4));
+    expect(sentences).toEqual(segmentText(aozoraExcerpt).sentences);
+    for (const unit of units) {
+      expect(aozoraExcerpt.slice(unit.start, unit.end)).toBe(unit.text);
+    }
+  });
+
+  it("区切りの位置で分けた単位も、文末と空白では分け、段落の外の位置は無視する", () => {
+    // 文末をまたぐ区切り (「猫である。名前は」) と、段落の長さを超える位置 (100) を渡す
+    const texts = segmentText("吾輩は猫である。名前は Allium sativum である。", [[3, 11, 100]]).units.map((unit) => unit.text);
+    expect(texts).toEqual(["吾輩は", "猫である。", "名前は", "Allium", "sativum", "である。"]);
+  });
+
+  it("英語の段落には区切りの位置を使わない", () => {
+    expect(segmentText("Speed reading.", [[3]]).units.map((unit) => unit.text)).toEqual(["Speed", "reading."]);
+  });
+
   it("日本語の読点に間をとり、閉じ括弧を文末に含める", () => {
     const { sentences, units } = segmentText("「ええ、そうです」と彼は言った。");
     expect(units.map((unit) => [unit.text, unit.pause])).toEqual([
