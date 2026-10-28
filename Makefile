@@ -30,6 +30,32 @@ test-worker:
 
 check: lint build-web typecheck test typecheck-worker test-worker
 
+# ios/ の iOS アプリ (documents/adr/0006-ios-native-app-with-on-device-mecab.md)。Xcode プロジェクトは ios/project.yml から xcodegen で生成する
+IOS_DERIVED_DATA := ios/build
+IOS_APP := $(IOS_DERIVED_DATA)/Build/Products/Debug-iphonesimulator/Sokudoku.app
+
+.PHONY: ios-project test-ios build-ios ios screenshots-ios
+ios-project:
+	cd ios && xcodegen generate
+
+# 文節分割・表示時間・読書位置の計算 (SokudokuCore) を macOS 上の SwiftPM でテストする
+test-ios:
+	swift test --package-path ios/SokudokuCore
+
+# シミュレータ向けにビルドだけを行う (署名しない)。SOKUDOKU_EXTRACT_URL=<Worker のオリジン> を付けると URL からの取り込みを出す (既定は ios/project.yml)
+build-ios: ios-project
+	xcodebuild -project ios/Sokudoku.xcodeproj -scheme Sokudoku -destination 'generic/platform=iOS Simulator' -derivedDataPath $(IOS_DERIVED_DATA) CODE_SIGNING_ALLOWED=NO $(if $(SOKUDOKU_EXTRACT_URL),SOKUDOKU_EXTRACT_URL=$(SOKUDOKU_EXTRACT_URL)) build
+
+# プロジェクト固有のシミュレータ (sim-boot) を起動し、ビルドしたアプリを入れて起動する
+ios: build-ios
+	sim-boot
+	xcrun simctl install "$$(sim-id)" $(IOS_APP)
+	xcrun simctl launch "$$(sim-id)" com.bannzai.sokudoku
+
+# App Store のスクリーンショットを撮り、ios/fastlane/screenshots/ に置く (ios/scripts/appstore-screenshots.sh)
+screenshots-ios:
+	bash ios/scripts/appstore-screenshots.sh
+
 # 引数なしの make で web を実行する (人が手で動作確認するための入口。検査・テストは CI が行う)
 .DEFAULT_GOAL := web
 

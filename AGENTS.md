@@ -1,13 +1,13 @@
 # AGENTS.md
 
-日本語・英語の文章を 1 語 (日本語は文節) ずつ同じ位置へ表示して速く読む RSVP 速読リーダー。機能は `documents/PROJECT.md`、仮説・判定基準・決めたことは `documents/DIRECTION.md`、技術方針は `documents/adr/0001-static-export-on-github-pages.md`、特許・権利上の制約は `documents/adr/0002-avoid-patented-features-and-drm-import.md` を正とする。
+日本語・英語の文章を 1 語 (日本語は文節) ずつ同じ位置へ表示して速く読む RSVP 速読リーダー。機能は `documents/PROJECT.md`、仮説・判定基準・決めたことは `documents/DIRECTION.md`、技術方針は `documents/adr/0001-static-export-on-github-pages.md`、特許・権利上の制約は `documents/adr/0002-avoid-patented-features-and-drm-import.md`、`ios/` の iOS アプリの方針は `documents/adr/0006-ios-native-app-with-on-device-mecab.md` を正とする。
 
 main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ自動配布する。
 
 ## 不変条件
 
-- 読み込んだ本文をサーバー・外部サービスへ送らない、保存しない。処理はすべてブラウザ内で行う (ADR 0001)
-  - 例外: URL からの取り込みだけは、ページの URL を `worker/` の Cloudflare Worker へ送り、Worker が公開ページの取得と本文の抽出を行う。Worker は URL・本文を保存・記録しない (ADR 0004)
+- 読み込んだ本文をサーバー・外部サービスへ送らない、保存しない。処理はすべてブラウザ内 (iOS アプリは端末内) で行う (ADR 0001・0006)
+  - 例外: URL からの取り込みだけは、ページの URL を `worker/` の Cloudflare Worker へ送り、Worker が公開ページの取得と本文の抽出を行う。Worker は URL・本文を保存・記録しない (ADR 0004)。iOS アプリの URL の入力と共有シートから受けたページの URL も同じ Worker へ URL だけを送る (ADR 0006)
   - 例外: URL からの取り込みの本文 (公開ページの本文) だけは、Worker の中で Cloudflare Workers AI に段落ごとの区切りを問い合わせる。Worker は本文・LLM の応答を保存・記録せず、フロントは区切りの位置だけを localStorage に保存する。貼り付け・ファイルの本文は LLM に送らない (ADR 0005)
 - 文節 (単語) は中央揃えで表示する。ORP を定位置に揃える配置・特定の 1 文字の色付け・文節の中の文字を位置で変える見た目を作らない (ADR 0002)
 - 再生中に全文を出さない。全文と現在位置のハイライトは停止中だけ出す。本・記事の一覧を表示したまま再生しない (ADR 0002)
@@ -16,16 +16,17 @@ main へのマージで `deploy.yml` が https://bannzai.github.io/sokudoku/ へ
 
 ## 検証方法
 
-ビルド・テスト・ブラウザでの動作確認は外部マシンに任せ、このマシン (ローカル Mac) の負荷を避ける。本リポジトリは public のため GitHub Actions の Linux runner を使う (private に変える場合は Devin のセッションに移す)。
+ビルド・テスト・ブラウザでの動作確認は外部マシンに任せ、このマシン (ローカル Mac) の負荷を避ける。本リポジトリは public のため GitHub Actions の Linux runner (iOS アプリは macOS runner) を使う (private に変える場合は Devin のセッションに移す)。
 
 | 対象 | 方法 |
 | --- | --- |
 | lint / 型検査 / テスト / ビルド | PR の `ci.yml` の結果で確認する (`make check` と同じコマンド)。ローカルでは CI の失敗を再現・修正する時だけ `make setup` → `make check` を実行する |
 | ブラウザでの動作確認 | webtunnel skill (`~/.claude/skills/webtunnel/SKILL.md`) で、GitHub Actions runner 上の Chromium と dev サーバ (`browser-session.yml`) を開く。`WEBTUNNEL_REPO=bannzai/sokudoku` と `--ref <ブランチ>` で PR のコードを開き、dev サーバの URL は http://127.0.0.1:3000/sokudoku/ 。UI の変更はスクリーンショットを Read して目視確認してから完了報告する (HTTP 200 やビルド成功で表示を判断しない)。ローカルの agent-browser は runner から再現できない時だけ使い、理由を PR に書く |
+| iOS アプリ | `make test-ios` (SokudokuCore の `swift test`) と `make build-ios` は、`ios/` を変えた PR で macOS runner が実行する `ios.yml` の結果で確認する。ローカルでは CI の失敗を再現・修正する時だけ実行する。画面の確認は ios-simulator skill (`~/.claude/skills/ios-simulator/SKILL.md`) に従い、`make ios` でプロジェクト固有のシミュレータに入れて起動し、スクリーンショットで確かめる |
 | 公開後の確認 | https://bannzai.github.io/sokudoku/ を webtunnel のセッションで開く |
 | 公開後の利用状況の分析 | `/cloudflare-web-analytics-report` (設定は `.claude/cloudflare-web-analytics.json`) で Cloudflare Web Analytics の日別の訪問数・人気ページを読む |
 
-`make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `web` (`dev` と同じサーバーを起動し、http://localhost:3000/sokudoku/ をブラウザで開く。引数なしの `make` で実行される。人が手で動作確認するための入口で、検査・テストは含めず CI が行う) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `typecheck-worker`・`test-worker` (`worker/` の Worker) / `check` (lint・typecheck・test・build-web・typecheck-worker・test-worker) / `verify` (`check` と同じ)
+`make` の target: `setup` (依存の導入) / `dev` (http://localhost:3000/sokudoku/) / `web` (`dev` と同じサーバーを起動し、http://localhost:3000/sokudoku/ をブラウザで開く。引数なしの `make` で実行される。人が手で動作確認するための入口で、検査・テストは含めず CI が行う) / `lint` / `typecheck` / `test` / `build-web` (`out/` へ静的書き出し) / `typecheck-worker`・`test-worker` (`worker/` の Worker) / `check` (lint・typecheck・test・build-web・typecheck-worker・test-worker) / `verify` (`check` と同じ) / `ios-project` (`ios/project.yml` から xcodegen で Xcode プロジェクトを生成) / `test-ios` / `build-ios` / `ios` (sim-boot のシミュレータへ入れて起動)
 
 `worker/` の Worker は `wrangler dev` をローカルで起動せず、vitest の単体テストと、main へのマージで `deploy-worker.yml` が行う配信で確かめる。
 
