@@ -32,7 +32,7 @@ final class URLImportTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalAndRemoteCacheData)
         XCTAssertFalse(request.httpShouldHandleCookies)
-        XCTAssertEqual(request.timeoutInterval, 20)
+        XCTAssertEqual(request.timeoutInterval, 30)
     }
 
     func testQueryValueEncodesReservedCharactersSoWorkerReadsTheSameURL() throws {
@@ -107,7 +107,7 @@ final class URLImportTests: XCTestCase {
     }
 
     func testExtractSessionKeepsNoCookiesNorCacheAndLimitsTotalTime() {
-        XCTAssertEqual(extractURLSession.configuration.timeoutIntervalForResource, 20)
+        XCTAssertEqual(extractURLSession.configuration.timeoutIntervalForResource, 30)
         XCTAssertNil(extractURLSession.configuration.httpCookieStorage)
         XCTAssertNil(extractURLSession.configuration.urlCache)
     }
