@@ -44,15 +44,13 @@ export function Reader() {
   async function openText(source: string, paragraphBoundaries?: ParagraphBoundaries) {
     const textHash = await hashText(source);
     const savedParagraphBoundaries = loadParagraphBoundaries(textHash);
-    // BudouX だけの分割での読書位置を探すのは、区切りの位置を受け取ったが保存が無い時だけにし、ほかの時に本文を 2 回分割しない
-    const startedWithoutBoundaries =
-      savedParagraphBoundaries === undefined &&
-      paragraphBoundaries !== undefined &&
-      loadReadingPosition(textHash, segmentText(source).units.length) !== undefined;
     const usedParagraphBoundaries = paragraphBoundariesForOpening(
       savedParagraphBoundaries,
       paragraphBoundaries,
-      startedWithoutBoundaries,
+      // BudouX だけの分割での読書位置を探すのは、区切りの位置を受け取ったが保存が無い時だけにし、ほかの時に本文を 2 回分割しない
+      savedParagraphBoundaries === undefined &&
+        paragraphBoundaries !== undefined &&
+        loadReadingPosition(textHash, segmentText(source).units.length) !== undefined,
     );
     if (savedParagraphBoundaries === undefined && usedParagraphBoundaries !== undefined) {
       saveParagraphBoundaries(textHash, usedParagraphBoundaries, Date.now());
