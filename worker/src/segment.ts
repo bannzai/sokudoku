@@ -68,15 +68,14 @@ export async function segmentParagraphs(
   paragraphs: readonly string[],
   timeoutMilliseconds = segmentationTimeoutMilliseconds,
 ): Promise<ParagraphBoundaries> {
-  const targets = segmentationTargets(paragraphs);
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<null>((resolve) => {
     timeoutId = setTimeout(() => resolve(null), timeoutMilliseconds);
   });
   try {
     return await Promise.all(
-      paragraphs.map((paragraph, index) =>
-        targets[index] ? Promise.race([segmentParagraph(ai, paragraph), deadline]) : null,
+      segmentationTargets(paragraphs).map((isTarget, index) =>
+        isTarget ? Promise.race([segmentParagraph(ai, paragraphs[index]), deadline]) : null,
       ),
     );
   } finally {
