@@ -12,7 +12,7 @@ import {
 type FakeElement = {
   /** 要素の種類 ("div"・"p"・"a"・"body") */
   tagName: string;
-  /** append された子 */
+  /** appendChild された子 */
   children: FakeElement[];
   /** setAttribute された属性 */
   attributes: Record<string, string>;
@@ -20,7 +20,7 @@ type FakeElement = {
   textContent: string;
   /** インラインの style */
   style: { cssText: string };
-  /** append された先 */
+  /** appendChild された先 */
   parent: FakeElement | null;
   /** 属性を設定する */
   setAttribute(name: string, value: string): void;
@@ -29,7 +29,7 @@ type FakeElement = {
   /** 属性があるか */
   hasAttribute(name: string): boolean;
   /** child を子の末尾に足す */
-  append(child: FakeElement): void;
+  appendChild(child: FakeElement): void;
   /** 自分を親から外す */
   remove(): void;
 };
@@ -50,7 +50,7 @@ function fakeElement(tagName: string): FakeElement {
       delete element.attributes[name];
     },
     hasAttribute: (name) => name in element.attributes,
-    append: (child) => {
+    appendChild: (child) => {
       child.parent = element;
       element.children.push(child);
     },
@@ -110,7 +110,12 @@ function switchableFetch(initialBody: unknown) {
   return control;
 }
 
-/** condition が成り立つまで待つ。成り立たないまま 1000 回確かめたら落とす */
+/**
+ * condition が成り立つまで待つ。成り立たないまま 1000 回確かめたら落とす。
+ * 1000 回は、このファイルの全テストで成り立つまでに setImmediate を待った回数の実測の最大 (1 回。2026-11-27 に 5 回実行して計測) に大きな余裕を取りつつ、
+ * 成り立たない時に 1 秒より十分短く (1000 回の setImmediate は Node 22 で実測 20〜26 ms。1 分の load average が 29 の Mac で計測) 落として、
+ * テストが止まったように見えなくするための上限
+ */
 async function waitFor(condition: () => boolean, description: string): Promise<void> {
   for (let attempt = 0; attempt < 1000; attempt += 1) {
     if (condition()) return;
@@ -178,8 +183,8 @@ test("メンテナンス中は通常の画面の要素を inert にし、終わ�
   const normalScreen = fakeElement("main");
   const alreadyInert = fakeElement("aside");
   alreadyInert.setAttribute("inert", "");
-  body.append(normalScreen);
-  body.append(alreadyInert);
+  body.appendChild(normalScreen);
+  body.appendChild(alreadyInert);
   const control = switchableFetch(NOT_IN_MAINTENANCE_JSON);
   const stop = mountMaintenanceGate({ stateURL: STATE_URL, defaultMessage: "ただいまメンテナンス中です", document, fetchImpl: control.fetchImpl });
   await waitFor(() => control.calls === 1, "起動時に読む");
@@ -222,7 +227,7 @@ test("同じ状態を読み直した時は画面を作り直さず、文が変�
 test("止めると、inert にした通常の画面の要素を戻す", async () => {
   const { document, body } = fakeDocument();
   const normalScreen = fakeElement("main");
-  body.append(normalScreen);
+  body.appendChild(normalScreen);
   const stop = mountMaintenanceGate({
     stateURL: STATE_URL,
     defaultMessage: "ただいまメンテナンス中です",
@@ -320,6 +325,23 @@ test("後から始めた読み取りが先に返った時は、古い読み取�
   await settlePromises();
   assert.deepEqual(states, [false]);
   stop();
+});
+
+test("応答を待つ間に止めた時は、その後に応答が返っても onState に渡さない", async () => {
+  const { document } = fakeDocument();
+  const pendingResponses: ((response: Response) => void)[] = [];
+  const states: boolean[] = [];
+  const stop = watchMaintenanceState({
+    stateURL: STATE_URL,
+    document,
+    fetchImpl: () => new Promise((resolve) => pendingResponses.push(resolve)),
+    onState: (state) => states.push(state.maintenance),
+  });
+  assert.strictEqual(pendingResponses.length, 1);
+  stop();
+  pendingResponses[0](new Response(JSON.stringify(IN_MAINTENANCE_WITH_BUTTON_JSON)));
+  await settlePromises();
+  assert.deepEqual(states, []);
 });
 
 test("止めると、出ていた画面を消し、前面に戻っても時間が過ぎても読まない", async () => {

@@ -71,7 +71,10 @@ export function createMaintenanceScreen(ownerDocument: Document, state: Maintena
     "position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px;background:#fff;color:#111;text-align:center";
   const message = ownerDocument.createElement("p");
   message.textContent = state.message ?? defaultMessage;
-  screen.append(message);
+  // 子は append ではなく appendChild で足す。wrangler が生成する cloudflare-env.d.ts は HTMLRewriter の
+  // append の型 (受け取るのは string | ReadableStream | Response) をグローバルの Element に足し、その d.ts を含む
+  // プロジェクトでは append に要素を渡すと型検査が TS2345 で失敗するため (castle#3683)
+  screen.appendChild(message);
   if (state.button !== null) {
     const button = ownerDocument.createElement("a");
     button.textContent = state.button.label;
@@ -80,7 +83,7 @@ export function createMaintenanceScreen(ownerDocument: Document, state: Maintena
     // 画面の文と同じ配色を反転した仮の値 (組み込むプロダクトのデザインに合わせて直す前提)。
     // 余白 12px・24px は画面の余白 24px の半分と同じ、角の丸み 8px はその 3 分の 1 で、余白とそろえた比率にした
     button.style.cssText = "padding:12px 24px;border-radius:8px;background:#111;color:#fff;text-decoration:none";
-    screen.append(button);
+    screen.appendChild(button);
   }
   return screen;
 }
@@ -116,7 +119,7 @@ export function mountMaintenanceGate(options: MaintenanceGateOptions): () => voi
       for (const element of inertedElements) element.setAttribute("inert", "");
       screen = createMaintenanceScreen(ownerDocument, state, options.defaultMessage);
       shownStateJSON = JSON.stringify(state);
-      ownerDocument.body.append(screen);
+      ownerDocument.body.appendChild(screen);
     },
   });
   return () => {
