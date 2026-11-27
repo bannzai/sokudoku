@@ -77,7 +77,7 @@ class ExtractFailure extends Error {
 
 /**
  * このサービスがメンテナンス中かを読む読み手。owner が service-maintenance コマンド (castle の service-maintenance-setup skill) で切り替える状態を、
- * インスタンスごとに 60 秒覚える。Workers ではあるリクエストが始めた読み取りを別のリクエストに待たせないため shareConcurrentReads を false にする
+ * インスタンスごとに maintenance-state.ts の DEFAULT_SERVER_CACHE_MS の間覚える。Workers ではあるリクエストが始めた読み取りを別のリクエストに待たせないため shareConcurrentReads を false にする
  */
 const readMaintenanceState = createMaintenanceReader({
   stateURL: "https://service-maintenance.star-kojiki.workers.dev/sokudoku",
@@ -122,7 +122,8 @@ export async function handleRequest(
   // メンテナンス中は、ページの取得と Workers AI (費用のかかる処理) の呼び出しの前に断る
   const maintenanceBlocked = await maintenanceResponse(readMaintenanceState);
   if (maintenanceBlocked !== null) {
-    return maintenanceBlocked;
+    // ほかのエラーの応答と同じ CORS のヘッダーを付け、フロントが 503 と body の maintenance を読めるようにする
+    return new Response(maintenanceBlocked.body, { status: maintenanceBlocked.status, headers: responseHeaders(origin) });
   }
   // 回数を数えるためだけに IP を使い、記録はしない
   const rateLimitKey = rateLimitKeyForIp(request.headers.get("CF-Connecting-IP"));

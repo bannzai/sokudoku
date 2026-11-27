@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { articleHtml, articleParagraphs } from "./__fixtures__/articlePage";
-import { decodeHtml, type Env, handleRequest, rateLimitKeyForIp } from "./index";
+import worker, { decodeHtml, type Env, handleRequest, rateLimitKeyForIp } from "./index";
 import { createMaintenanceReader, NOT_IN_MAINTENANCE } from "./maintenance/maintenance-state";
 
 /** URL ごとに返すレスポンスを決めた fetch の代わり。呼ばれた URL と init を記録する */
@@ -400,9 +400,65 @@ describe("handleRequest のメンテナンス中の判定", () => {
       readerReturning({ maintenance: true, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z" }),
     );
     expect(response.status).toBe(503);
+    // ほかのエラーの応答と同じく、許可したオリジンが 503 と body を読めるように CORS のヘッダーを付ける
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://bannzai.github.io");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ error: "maintenance", maintenance: { maintenance: true } });
     expect(fetchPage).not.toHaveBeenCalled();
     expect(runAi).not.toHaveBeenCalled();
+  });
+
+  it("利用量で切り替わった (source: usage) メンテナンス中も 503 で断る", async () => {
+    const runAi = countingAi();
+    expect(
+      (
+        await handleRequest(
+          extractRequest("https://example.com/article"),
+          fakeEnv(Number.POSITIVE_INFINITY, runAi),
+          articleFetch(),
+          readerReturning({ maintenance: true, message: null, button: null, source: "usage", changedAt: "2026-11-27T00:00:00.000Z" }),
+        )
+      ).status,
+    ).toBe(503);
+    expect(runAi).not.toHaveBeenCalled();
+  });
+
+  it("メンテナンス中も preflight (OPTIONS) には 503 ではなく 204 を返す", async () => {
+    const readMaintenanceState = vi.fn(async () => ({
+      maintenance: true,
+      message: null,
+      button: null,
+      source: "owner" as const,
+      changedAt: "2026-11-27T00:00:00.000Z",
+    }));
+    expect(
+      (
+        await handleRequest(
+          extractRequest("https://example.com/article", { method: "OPTIONS" }),
+          fakeEnv(Number.POSITIVE_INFINITY, countingAi()),
+          articleFetch(),
+          readMaintenanceState,
+        )
+      ).status,
+    ).toBe(204);
+    expect(readMaintenanceState).not.toHaveBeenCalled();
+  });
+
+  it("配信の入口 (default export の fetch) は本番の状態の URL を読み、メンテナンス中は 503 で断る", async () => {
+    const globalFetch = vi.fn(async (input: RequestInfo | URL) =>
+      String(input) === "https://service-maintenance.star-kojiki.workers.dev/sokudoku"
+        ? new Response(JSON.stringify({ maintenance: true, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z" }))
+        : new Response("not found", { status: 404 }),
+    );
+    vi.stubGlobal("fetch", globalFetch);
+    try {
+      const runAi = countingAi();
+      expect((await worker.fetch(extractRequest("https://example.com/article"), fakeEnv(Number.POSITIVE_INFINITY, runAi))).status).toBe(503);
+      expect(globalFetch).toHaveBeenCalledWith("https://service-maintenance.star-kojiki.workers.dev/sokudoku", expect.anything());
+      expect(runAi).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("通常に戻った (maintenance: false) 時は本文を取り出し、Workers AI に区切らせる", async () => {

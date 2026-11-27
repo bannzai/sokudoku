@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { Activity, type ReactNode, useEffect, useState } from "react";
 import { AppBar } from "@/components/AppBar";
 import { type MaintenanceState, NOT_IN_MAINTENANCE } from "@/lib/maintenance/maintenance-state";
 import { watchMaintenanceState } from "@/lib/maintenance/web-maintenance-gate";
@@ -19,15 +19,24 @@ const maintenanceStateURL =
 const defaultMaintenanceMessage = "しばらくしてからもう一度開いてください";
 
 /**
- * 状態を読み続け、メンテナンス中の間は children (通常の画面) の代わりにメンテナンス中の画面を出す。
+ * 状態を読み続け、メンテナンス中の間は children (通常の画面) を隠してメンテナンス中の画面を出す。
+ * children は Activity の hidden で隠し、state (開いた本文・入力中の文) を残したまま effect (再生のタイマー等) を止める。
+ * 本文は保存しないため (AGENTS.md の不変条件)、unmount すると通常に戻った時に読んでいた本文を失うため。
  * 状態を読めない時は通常の画面のまま動かす (watchMaintenanceState が「メンテナンス中でない」状態を渡す)
  */
 export function MaintenanceGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<MaintenanceState>(NOT_IN_MAINTENANCE);
   useEffect(() => watchMaintenanceState({ stateURL: maintenanceStateURL, onState: setState }), []);
-  if (!state.maintenance) {
-    return children;
-  }
+  return (
+    <>
+      <Activity mode={state.maintenance ? "hidden" : "visible"}>{children}</Activity>
+      {state.maintenance && <MaintenanceScreen state={state} />}
+    </>
+  );
+}
+
+/** メンテナンス中の画面。state の message と button を出し、message が null の時は既定の文を出す */
+function MaintenanceScreen({ state }: { state: MaintenanceState }) {
   return (
     <>
       {/* トップページへのリンクは、メンテナンス中は同じこの画面に戻るだけのため出さない */}

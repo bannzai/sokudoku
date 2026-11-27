@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MaintenanceGate } from "./MaintenanceGate";
@@ -41,9 +41,28 @@ describe("MaintenanceGate", () => {
     vi.unstubAllGlobals();
   });
 
+  /** 通常の画面の代わり。押した回数を state に持ち、隠れている間も state が残るかを確かめる */
+  function NormalScreen() {
+    const [count, setCount] = useState(0);
+    return (
+      <button type="button" onClick={() => setCount(count + 1)}>
+        通常の画面 {count}
+      </button>
+    );
+  }
+
   /** 通常の画面を MaintenanceGate で包んで出す */
   async function renderGate() {
-    await act(async () => root.render(<MaintenanceGate><p>通常の画面</p></MaintenanceGate>));
+    await act(async () => root.render(<MaintenanceGate><NormalScreen /></MaintenanceGate>));
+  }
+
+  /** 画面に見えている文。Activity が隠した (display: none の) 要素の文は含めない */
+  function visibleText() {
+    const copy = container.cloneNode(true) as HTMLElement;
+    for (const hidden of copy.querySelectorAll<HTMLElement>("*")) {
+      if (hidden.style.display === "none") hidden.remove();
+    }
+    return copy.textContent ?? "";
   }
 
   /** タブが前面に戻ったことにして、状態を読み直させる */
@@ -53,12 +72,15 @@ describe("MaintenanceGate", () => {
     });
   }
 
-  /** 画面の文に text が出るまで待つ */
+  /**
+   * 見えている文に text が出るまで待つ。timeout の既定 1000 ms は vi.waitFor の既定と同じで、
+   * テストの偽の fetch はすぐ応答するため足りる。時間切れの確かめだけは打ち切りの 2 秒を超えて待つ値を渡す
+   */
   async function waitForText(text: string, timeout = 1000) {
     await vi.waitFor(
       async () => {
         await act(async () => {});
-        expect(container.textContent).toContain(text);
+        expect(visibleText()).toContain(text);
       },
       { timeout },
     );
@@ -68,10 +90,17 @@ describe("MaintenanceGate", () => {
     respond = async () => jsonResponse(stateJSON({}));
     await renderGate();
     await waitForText("メンテナンス中");
-    expect(container.textContent).toContain("しばらくしてからもう一度開いてください");
-    expect(container.textContent).not.toContain("通常の画面");
-    expect(container.querySelector("a")).toBeNull();
+    expect(visibleText()).toContain("しばらくしてからもう一度開いてください");
+    expect(visibleText()).not.toContain("通常の画面");
+    expect(container.querySelector("main a")).toBeNull();
     expect(fetchState).toHaveBeenCalledWith(productionStateURL, expect.anything());
+  });
+
+  it("利用量で切り替わった (source: usage) メンテナンス中も、メンテナンス中の画面を出す", async () => {
+    respond = async () => jsonResponse(stateJSON({ source: "usage" }));
+    await renderGate();
+    await waitForText("メンテナンス中");
+    expect(visibleText()).not.toContain("通常の画面");
   });
 
   it("状態の message と button があれば、既定の文の代わりにその文とボタンを出す", async () => {
@@ -79,9 +108,9 @@ describe("MaintenanceGate", () => {
       jsonResponse(stateJSON({ message: "復旧までお待ちください", button: { label: "お知らせを見る", url: "https://example.com/news" } }));
     await renderGate();
     await waitForText("復旧までお待ちください");
-    expect(container.textContent).not.toContain("しばらくしてからもう一度開いてください");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe("https://example.com/news");
-    expect(container.querySelector("a")?.textContent).toBe("お知らせを見る");
+    expect(visibleText()).not.toContain("しばらくしてからもう一度開いてください");
+    expect(container.querySelector("main a")?.getAttribute("href")).toBe("https://example.com/news");
+    expect(container.querySelector("main a")?.textContent).toBe("お知らせを見る");
   });
 
   it("通常に戻った (maintenance: false) 状態を読むと、通常の画面に戻る", async () => {
@@ -91,7 +120,23 @@ describe("MaintenanceGate", () => {
     respond = async () => jsonResponse(stateJSON({ maintenance: false }));
     await returnToForeground();
     await waitForText("通常の画面");
-    expect(container.textContent).not.toContain("メンテナンス中");
+    expect(visibleText()).not.toContain("メンテナンス中");
+  });
+
+  it("メンテナンス中の間も通常の画面の state を残し、通常に戻った時に続きから出す", async () => {
+    respond = async () => jsonResponse(stateJSON({ maintenance: false }));
+    await renderGate();
+    await waitForText("通常の画面 0");
+    await act(async () => container.querySelector("button")?.click());
+    await act(async () => container.querySelector("button")?.click());
+    await waitForText("通常の画面 2");
+    respond = async () => jsonResponse(stateJSON({}));
+    await returnToForeground();
+    await waitForText("メンテナンス中");
+    expect(visibleText()).not.toContain("通常の画面");
+    respond = async () => jsonResponse(stateJSON({ maintenance: false }));
+    await returnToForeground();
+    await waitForText("通常の画面 2");
   });
 
   it.each<[string, (init: { signal: AbortSignal }) => Promise<Response>]>([
@@ -106,8 +151,9 @@ describe("MaintenanceGate", () => {
     await waitForText("メンテナンス中");
     respond = unreadable;
     await returnToForeground();
+    // 時間切れは打ち切りの 2 秒 (DEFAULT_FETCH_TIMEOUT_MS) の後に起きるため、その 2 倍まで待つ
     await waitForText("通常の画面", 4000);
-    expect(container.textContent).not.toContain("メンテナンス中");
+    expect(visibleText()).not.toContain("メンテナンス中");
   });
 
   it("最初の読み取りで状態を読めない時は、通常の画面のまま動かす", async () => {
@@ -115,7 +161,7 @@ describe("MaintenanceGate", () => {
     await renderGate();
     await vi.waitFor(() => expect(fetchState).toHaveBeenCalledTimes(1));
     await act(async () => {});
-    expect(container.textContent).toContain("通常の画面");
-    expect(container.textContent).not.toContain("メンテナンス中");
+    expect(visibleText()).toContain("通常の画面");
+    expect(visibleText()).not.toContain("メンテナンス中");
   });
 });
