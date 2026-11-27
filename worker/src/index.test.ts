@@ -79,7 +79,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
-    expect((await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(200);
+    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(200);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://bannzai.github.io");
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     const body = await response.json();
@@ -127,7 +128,8 @@ describe("handleRequest", () => {
     });
     const runAi = vi.fn(fakeAi((paragraph) => [paragraph]));
     const env = fakeEnv(Number.POSITIVE_INFINITY, runAi, counts.segmentAllowedCount, counts.segmentGlobalAllowedCount);
-    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
     expect(runAi).not.toHaveBeenCalled();
@@ -146,7 +148,8 @@ describe("handleRequest", () => {
     });
     const segmentLimit = vi.fn(async () => ({ success: true }));
     const env: Env = { ...fakeEnv(), SEGMENT_RATE_LIMITER: { limit: segmentLimit }, SEGMENT_GLOBAL_RATE_LIMITER: { limit: segmentLimit } };
-    expect((await handleRequest(extractRequest("https://example.com/english"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
+    const response = await handleRequest(extractRequest("https://example.com/english"), env, fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(200);
     expect((await response.json()).text).toContain(englishParagraph);
     expect(segmentLimit).not.toHaveBeenCalled();
   });
@@ -160,7 +163,8 @@ describe("handleRequest", () => {
       ...fakeEnv(),
       SEGMENT_RATE_LIMITER: { limit: async () => Promise.reject(new Error("rate limiter unavailable")) },
     };
-    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
@@ -170,7 +174,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
-    expect((await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(200);
+    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
@@ -188,14 +193,16 @@ describe("handleRequest", () => {
 
   it("http(s) でない URL を 400 の invalid-url にし、取得しない", async () => {
     const fetchPage = fakeFetch({});
-    expect((await handleRequest(extractRequest("file:///etc/passwd"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(400);
+    const response = await handleRequest(extractRequest("file:///etc/passwd"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid-url" });
     expect(fetchPage).not.toHaveBeenCalled();
   });
 
   it("プライベートアドレスを 400 の blocked-url にし、取得しない", async () => {
     const fetchPage = fakeFetch({});
-    expect((await handleRequest(extractRequest("http://192.168.0.1/admin"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(400);
+    const response = await handleRequest(extractRequest("http://192.168.0.1/admin"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "blocked-url" });
     expect(fetchPage).not.toHaveBeenCalled();
   });
@@ -205,7 +212,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/redirect": () => new Response(null, { status: 302, headers: { Location: "http://169.254.169.254/latest" } }),
     });
-    expect((await handleRequest(extractRequest("https://example.com/redirect"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(400);
+    const response = await handleRequest(extractRequest("https://example.com/redirect"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "blocked-url" });
     expect(fetchPage.mock.calls.map(([input]) => input.toString())).not.toContain("http://169.254.169.254/latest");
   });
@@ -229,7 +237,8 @@ describe("handleRequest", () => {
         new Response(null, { status: 302, headers: { Location: `https://example.com/r${index + 1}` } });
     }
     const fetchPage = fakeFetch(routes);
-    expect((await handleRequest(extractRequest("https://example.com/r0"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(502);
+    const response = await handleRequest(extractRequest("https://example.com/r0"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: "page-unavailable" });
     expect(fetchPage.mock.calls.filter(([input]) => input.toString() !== "https://example.com/robots.txt")).toHaveLength(6);
   });
@@ -239,7 +248,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/huge": () => htmlResponse("<p>x</p>", { "Content-Length": String(5 * 1024 * 1024 + 1) }),
     });
-    expect((await handleRequest(extractRequest("https://example.com/huge"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(413);
+    const response = await handleRequest(extractRequest("https://example.com/huge"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: "page-too-large" });
   });
 
@@ -265,7 +275,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/empty": () => htmlResponse("<!doctype html><html><body><img src=a.png></body></html>"),
     });
-    expect((await handleRequest(extractRequest("https://example.com/empty"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(422);
+    const response = await handleRequest(extractRequest("https://example.com/empty"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(422);
     expect(await response.json()).toEqual({ error: "unextractable" });
   });
 
@@ -281,7 +292,8 @@ describe("handleRequest", () => {
     const fetchPage = fakeFetch({
       "https://example.com/robots.txt": () => new Response("User-agent: *\nDisallow: /members/\n"),
     });
-    expect((await handleRequest(extractRequest("https://example.com/members/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(403);
+    const response = await handleRequest(extractRequest("https://example.com/members/article"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "robots-disallowed" });
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
@@ -291,7 +303,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": () => new Response("User-agent: *\nDisallow: /private/\n"),
       "https://example.com/public": () => new Response(null, { status: 302, headers: { Location: "/private/article" } }),
     });
-    expect((await handleRequest(extractRequest("https://example.com/public"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(403);
+    const response = await handleRequest(extractRequest("https://example.com/public"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "robots-disallowed" });
     expect(fetchPage.mock.calls.map(([input]) => input.toString())).not.toContain("https://example.com/private/article");
     expect(fetchPage.mock.calls.filter(([input]) => input.toString() === "https://example.com/robots.txt")).toHaveLength(1);
@@ -310,7 +323,8 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/paywall": () => new Response("login required", { status: 401 }),
     });
-    expect((await handleRequest(extractRequest("https://example.com/paywall"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(502);
+    const response = await handleRequest(extractRequest("https://example.com/paywall"), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: "page-unavailable" });
   });
 
@@ -329,14 +343,16 @@ describe("handleRequest", () => {
     const env = fakeEnv(1);
     expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
     fetchPage.mockClear();
-    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(429);
+    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(429);
     expect(await response.json()).toEqual({ error: "rate-limited" });
     expect(fetchPage).not.toHaveBeenCalled();
   });
 
   it("許可していないオリジンからの呼び出しを 403 にし、CORS のヘッダーを付けない", async () => {
     const fetchPage = fakeFetch({});
-    expect((await handleRequest(extractRequest("https://example.com/article", { origin: "https://evil.example" }), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(403);
+    const response = await handleRequest(extractRequest("https://example.com/article", { origin: "https://evil.example" }), fakeEnv(), fetchPage, readNotInMaintenance);
+    expect(response.status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect(fetchPage).not.toHaveBeenCalled();
   });
