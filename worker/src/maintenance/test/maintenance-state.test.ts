@@ -15,7 +15,7 @@ const UNREADABLE_FALLBACK = {
   maintenance: false,
   message: null,
   button: null,
-  source: "owner",
+  source: "owner" as const,
   changedAt: "1970-01-01T00:00:00.000Z",
 };
 
