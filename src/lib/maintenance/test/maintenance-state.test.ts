@@ -205,7 +205,9 @@ test("fetchMaintenanceState: ヘッダーが返った後に本文が届かなけ
 
 test("fetchMaintenanceState: 応答を読み終えた後に timeoutMs が過ぎても、渡した signal を abort しない (待つ上限のタイマーを残さない)", async () => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  onTestFinished(() => vi.useRealTimers());
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
   const signals: AbortSignal[] = [];
   assert.strictEqual(
     (
