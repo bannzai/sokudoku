@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { articleHtml, articleParagraphs } from "./__fixtures__/articlePage";
 import { decodeHtml, type Env, handleRequest, rateLimitKeyForIp } from "./index";
+import { createMaintenanceReader, NOT_IN_MAINTENANCE } from "./maintenance/maintenance-state";
 
 /** URL ごとに返すレスポンスを決めた fetch の代わり。呼ばれた URL と init を記録する */
 function fakeFetch(routes: Record<string, () => Response>) {
@@ -12,6 +13,9 @@ function fakeFetch(routes: Record<string, () => Response>) {
     return route();
   });
 }
+
+/** メンテナンス中でない状態を返す読み手。メンテナンスを確かめない test で使う */
+const readNotInMaintenance = async () => NOT_IN_MAINTENANCE;
 
 /** 指定した回数まで通す Rate Limiting binding の代わり */
 function fakeRateLimiter(allowedCount: number): Env["EXTRACT_RATE_LIMITER"] {
@@ -75,8 +79,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
-    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(200);
+    expect((await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(200);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://bannzai.github.io");
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     const body = await response.json();
@@ -91,7 +94,7 @@ describe("handleRequest", () => {
     });
     // 読点・句点の後ろで区切る
     const env = fakeEnv(Number.POSITIVE_INFINITY, fakeAi((paragraph) => paragraph.match(/[^、。]+[、。]?/g) ?? []));
-    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
+    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).json();
     const paragraphs: string[] = body.text.split("\n\n");
     expect(body.units).toHaveLength(paragraphs.length);
     // 「速読とは、/ 文章を通常よりも速い速度で読み、/ 内容を理解する技術の総称である。/ 古くから様々な方法が提案されてきた。」
@@ -108,7 +111,7 @@ describe("handleRequest", () => {
       Number.POSITIVE_INFINITY,
       fakeAi((paragraph) => (paragraph.match(/[^、。]+[、。]?/g) ?? []).map((unit) => unit.replace("文章", "ぶんしょう"))),
     );
-    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).json();
+    const body = await (await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).json();
     expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[0])]).toBeNull();
     // 「文章」の無い段落は連結すると一致するため、区切りを返す (「一方で、/ 読む速度を…知られている。/ 自分に合った速度を選び、/ 必要なら…」)
     expect(body.units[body.text.split("\n\n").indexOf(articleParagraphs[2])]).toEqual([4, 32, 44]);
@@ -124,8 +127,7 @@ describe("handleRequest", () => {
     });
     const runAi = vi.fn(fakeAi((paragraph) => [paragraph]));
     const env = fakeEnv(Number.POSITIVE_INFINITY, runAi, counts.segmentAllowedCount, counts.segmentGlobalAllowedCount);
-    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
-    expect(response.status).toBe(200);
+    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
     expect(runAi).not.toHaveBeenCalled();
@@ -144,8 +146,7 @@ describe("handleRequest", () => {
     });
     const segmentLimit = vi.fn(async () => ({ success: true }));
     const env: Env = { ...fakeEnv(), SEGMENT_RATE_LIMITER: { limit: segmentLimit }, SEGMENT_GLOBAL_RATE_LIMITER: { limit: segmentLimit } };
-    const response = await handleRequest(extractRequest("https://example.com/english"), env, fetchPage);
-    expect(response.status).toBe(200);
+    expect((await handleRequest(extractRequest("https://example.com/english"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
     expect((await response.json()).text).toContain(englishParagraph);
     expect(segmentLimit).not.toHaveBeenCalled();
   });
@@ -159,8 +160,7 @@ describe("handleRequest", () => {
       ...fakeEnv(),
       SEGMENT_RATE_LIMITER: { limit: async () => Promise.reject(new Error("rate limiter unavailable")) },
     };
-    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
-    expect(response.status).toBe(200);
+    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
@@ -170,8 +170,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
-    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(200);
+    expect((await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(200);
     const body = await response.json();
     expect(body.units).toEqual(body.text.split("\n\n").map(() => null));
   });
@@ -181,7 +180,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
-    await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage);
+    await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance);
     const pageInit = fetchPage.mock.calls.find(([input]) => input.toString() === "https://example.com/article")?.[1];
     expect(pageInit).toMatchObject({ redirect: "manual", cache: "no-store" });
     expect(new Headers(pageInit?.headers).get("User-Agent")).toBe("sokudoku-extract/1.0 (+https://bannzai.github.io/sokudoku/)");
@@ -189,16 +188,14 @@ describe("handleRequest", () => {
 
   it("http(s) でない URL を 400 の invalid-url にし、取得しない", async () => {
     const fetchPage = fakeFetch({});
-    const response = await handleRequest(extractRequest("file:///etc/passwd"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(400);
+    expect((await handleRequest(extractRequest("file:///etc/passwd"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid-url" });
     expect(fetchPage).not.toHaveBeenCalled();
   });
 
   it("プライベートアドレスを 400 の blocked-url にし、取得しない", async () => {
     const fetchPage = fakeFetch({});
-    const response = await handleRequest(extractRequest("http://192.168.0.1/admin"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(400);
+    expect((await handleRequest(extractRequest("http://192.168.0.1/admin"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(400);
     expect(await response.json()).toEqual({ error: "blocked-url" });
     expect(fetchPage).not.toHaveBeenCalled();
   });
@@ -208,8 +205,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/redirect": () => new Response(null, { status: 302, headers: { Location: "http://169.254.169.254/latest" } }),
     });
-    const response = await handleRequest(extractRequest("https://example.com/redirect"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(400);
+    expect((await handleRequest(extractRequest("https://example.com/redirect"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(400);
     expect(await response.json()).toEqual({ error: "blocked-url" });
     expect(fetchPage.mock.calls.map(([input]) => input.toString())).not.toContain("http://169.254.169.254/latest");
   });
@@ -222,8 +218,7 @@ describe("handleRequest", () => {
       "https://www.example.com/a": () => new Response(null, { status: 302, headers: { Location: "/article" } }),
       "https://www.example.com/article": () => htmlResponse(articleHtml),
     });
-    const response = await handleRequest(extractRequest("http://example.com/a"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(200);
+    expect((await handleRequest(extractRequest("http://example.com/a"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(200);
     expect(fetchPage.mock.calls.map(([input]) => input.toString())).toContain("https://www.example.com/robots.txt");
   });
 
@@ -234,8 +229,7 @@ describe("handleRequest", () => {
         new Response(null, { status: 302, headers: { Location: `https://example.com/r${index + 1}` } });
     }
     const fetchPage = fakeFetch(routes);
-    const response = await handleRequest(extractRequest("https://example.com/r0"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(502);
+    expect((await handleRequest(extractRequest("https://example.com/r0"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(502);
     expect(await response.json()).toEqual({ error: "page-unavailable" });
     expect(fetchPage.mock.calls.filter(([input]) => input.toString() !== "https://example.com/robots.txt")).toHaveLength(6);
   });
@@ -245,8 +239,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/huge": () => htmlResponse("<p>x</p>", { "Content-Length": String(5 * 1024 * 1024 + 1) }),
     });
-    const response = await handleRequest(extractRequest("https://example.com/huge"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(413);
+    expect((await handleRequest(extractRequest("https://example.com/huge"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(413);
     expect(await response.json()).toEqual({ error: "page-too-large" });
   });
 
@@ -264,8 +257,7 @@ describe("handleRequest", () => {
           { status: 200, headers: { "Content-Type": "text/html" } },
         ),
     });
-    const response = await handleRequest(extractRequest("https://example.com/stream"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(413);
+    expect((await handleRequest(extractRequest("https://example.com/stream"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(413);
   });
 
   it("本文を取り出せないページを 422 の unextractable にする", async () => {
@@ -273,8 +265,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/empty": () => htmlResponse("<!doctype html><html><body><img src=a.png></body></html>"),
     });
-    const response = await handleRequest(extractRequest("https://example.com/empty"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(422);
+    expect((await handleRequest(extractRequest("https://example.com/empty"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(422);
     expect(await response.json()).toEqual({ error: "unextractable" });
   });
 
@@ -283,16 +274,14 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/file.pdf": () => new Response("%PDF", { headers: { "Content-Type": "application/pdf" } }),
     });
-    const response = await handleRequest(extractRequest("https://example.com/file.pdf"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(422);
+    expect((await handleRequest(extractRequest("https://example.com/file.pdf"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(422);
   });
 
   it("robots.txt が Disallow したページを 403 の robots-disallowed にし、ページを取得しない", async () => {
     const fetchPage = fakeFetch({
       "https://example.com/robots.txt": () => new Response("User-agent: *\nDisallow: /members/\n"),
     });
-    const response = await handleRequest(extractRequest("https://example.com/members/article"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(403);
+    expect((await handleRequest(extractRequest("https://example.com/members/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(403);
     expect(await response.json()).toEqual({ error: "robots-disallowed" });
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
@@ -302,8 +291,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": () => new Response("User-agent: *\nDisallow: /private/\n"),
       "https://example.com/public": () => new Response(null, { status: 302, headers: { Location: "/private/article" } }),
     });
-    const response = await handleRequest(extractRequest("https://example.com/public"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(403);
+    expect((await handleRequest(extractRequest("https://example.com/public"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(403);
     expect(await response.json()).toEqual({ error: "robots-disallowed" });
     expect(fetchPage.mock.calls.map(([input]) => input.toString())).not.toContain("https://example.com/private/article");
     expect(fetchPage.mock.calls.filter(([input]) => input.toString() === "https://example.com/robots.txt")).toHaveLength(1);
@@ -313,8 +301,7 @@ describe("handleRequest", () => {
     const fetchPage = fakeFetch({
       "https://example.com/robots.txt": () => new Response("error", { status: 503 }),
     });
-    const response = await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(502);
+    expect((await handleRequest(extractRequest("https://example.com/article"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(502);
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
 
@@ -323,8 +310,7 @@ describe("handleRequest", () => {
       "https://example.com/robots.txt": robotsNotFound,
       "https://example.com/paywall": () => new Response("login required", { status: 401 }),
     });
-    const response = await handleRequest(extractRequest("https://example.com/paywall"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(502);
+    expect((await handleRequest(extractRequest("https://example.com/paywall"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(502);
     expect(await response.json()).toEqual({ error: "page-unavailable" });
   });
 
@@ -332,8 +318,7 @@ describe("handleRequest", () => {
     const fetchPage = vi.fn(async () => {
       throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
     });
-    const response = await handleRequest(extractRequest("https://example.com/slow"), fakeEnv(), fetchPage);
-    expect(response.status).toBe(502);
+    expect((await handleRequest(extractRequest("https://example.com/slow"), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(502);
   });
 
   it("同じ IP からの回数が上限を超えたら 429 の rate-limited にし、取得しない", async () => {
@@ -342,32 +327,101 @@ describe("handleRequest", () => {
       "https://example.com/article": () => htmlResponse(articleHtml),
     });
     const env = fakeEnv(1);
-    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage)).status).toBe(200);
+    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(200);
     fetchPage.mockClear();
-    const response = await handleRequest(extractRequest("https://example.com/article"), env, fetchPage);
-    expect(response.status).toBe(429);
+    expect((await handleRequest(extractRequest("https://example.com/article"), env, fetchPage, readNotInMaintenance)).status).toBe(429);
     expect(await response.json()).toEqual({ error: "rate-limited" });
     expect(fetchPage).not.toHaveBeenCalled();
   });
 
   it("許可していないオリジンからの呼び出しを 403 にし、CORS のヘッダーを付けない", async () => {
     const fetchPage = fakeFetch({});
-    const response = await handleRequest(extractRequest("https://example.com/article", { origin: "https://evil.example" }), fakeEnv(), fetchPage);
-    expect(response.status).toBe(403);
+    expect((await handleRequest(extractRequest("https://example.com/article", { origin: "https://evil.example" }), fakeEnv(), fetchPage, readNotInMaintenance)).status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect(fetchPage).not.toHaveBeenCalled();
   });
 
   it.each(["http://localhost:3000", "http://127.0.0.1:3000"])("dev サーバ (%s) からの呼び出しを許可する", async (origin) => {
-    const response = await handleRequest(extractRequest("file:///", { origin }), fakeEnv(), fakeFetch({}));
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    expect((await handleRequest(extractRequest("file:///", { origin }), fakeEnv(), fakeFetch({}), readNotInMaintenance)).headers.get("Access-Control-Allow-Origin")).toBe(origin);
   });
 
   it("/extract 以外のパスは 404、GET 以外は 405 にする", async () => {
-    const notFound = await handleRequest(new Request("https://sokudoku-extract.example.workers.dev/"), fakeEnv(), fakeFetch({}));
-    expect(notFound.status).toBe(404);
-    const post = await handleRequest(extractRequest("https://example.com/", { method: "POST" }), fakeEnv(), fakeFetch({}));
-    expect(post.status).toBe(405);
+    expect((await handleRequest(new Request("https://sokudoku-extract.example.workers.dev/"), fakeEnv(), fakeFetch({}), readNotInMaintenance)).status).toBe(404);
+    expect((await handleRequest(extractRequest("https://example.com/", { method: "POST" }), fakeEnv(), fakeFetch({}), readNotInMaintenance)).status).toBe(405);
+  });
+});
+
+describe("handleRequest のメンテナンス中の判定", () => {
+  /** 状態を返す Worker が body を返した時の読み手。状態の解釈は本番と同じ createMaintenanceReader で行う */
+  function readerReturning(body: unknown, status = 200) {
+    return createMaintenanceReader({
+      stateURL: "https://service-maintenance.example.workers.dev/sokudoku",
+      shareConcurrentReads: false,
+      fetchImpl: async () => new Response(JSON.stringify(body), { status }),
+    });
+  }
+
+  /** 本文を区切る Workers AI の代わり。呼ばれた回数を数える */
+  function countingAi() {
+    return vi.fn(fakeAi((paragraph) => [paragraph]));
+  }
+
+  /** 公開ページと robots.txt を返す fetch の代わり */
+  function articleFetch() {
+    return fakeFetch({
+      "https://example.com/robots.txt": robotsNotFound,
+      "https://example.com/article": () => htmlResponse(articleHtml),
+    });
+  }
+
+  it("メンテナンス中は 503 で断り、ページの取得も Workers AI の呼び出しもしない", async () => {
+    const fetchPage = articleFetch();
+    const runAi = countingAi();
+    const response = await handleRequest(
+      extractRequest("https://example.com/article"),
+      fakeEnv(Number.POSITIVE_INFINITY, runAi),
+      fetchPage,
+      readerReturning({ maintenance: true, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z" }),
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "maintenance", maintenance: { maintenance: true } });
+    expect(fetchPage).not.toHaveBeenCalled();
+    expect(runAi).not.toHaveBeenCalled();
+  });
+
+  it("通常に戻った (maintenance: false) 時は本文を取り出し、Workers AI に区切らせる", async () => {
+    const runAi = countingAi();
+    expect(
+      (
+        await handleRequest(
+          extractRequest("https://example.com/article"),
+          fakeEnv(Number.POSITIVE_INFINITY, runAi),
+          articleFetch(),
+          readerReturning({ maintenance: false, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z" }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(runAi).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["通信の失敗", createMaintenanceReader({ stateURL: "https://service-maintenance.example.workers.dev/sokudoku", shareConcurrentReads: false, fetchImpl: async () => Promise.reject(new TypeError("fetch failed")) })],
+    ["時間切れ", createMaintenanceReader({ stateURL: "https://service-maintenance.example.workers.dev/sokudoku", shareConcurrentReads: false, timeoutMs: 1, fetchImpl: (_url, init) => new Promise<Response>((_resolve, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason))) })],
+    ["500 の応答", readerReturning({ error: "unavailable" }, 500)],
+    ["形の違う応答", readerReturning({ maintenance: "true" })],
+  ])("状態を読めない時 (%s) は通常どおり本文を取り出す", async (_name, readMaintenanceState) => {
+    const runAi = countingAi();
+    expect(
+      (
+        await handleRequest(
+          extractRequest("https://example.com/article"),
+          fakeEnv(Number.POSITIVE_INFINITY, runAi),
+          articleFetch(),
+          readMaintenanceState,
+        )
+      ).status,
+    ).toBe(200);
+    expect(runAi).toHaveBeenCalled();
   });
 });
 

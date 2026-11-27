@@ -3,6 +3,9 @@ name = "sokudoku-extract"
 main = "src/index.ts"
 # fetch の cache: "no-store" (取得したページを Cloudflare のキャッシュに残さない) には 2024-11-11 以降の日付が要る
 compatibility_date = "2025-09-01"
+# メンテナンス中かを読む状態の Worker (https://service-maintenance.star-kojiki.workers.dev) とこの Worker を同じアカウントで配信すると同じ workers.dev の zone になり、
+# 同じ zone の Worker への fetch はこのフラグが無いと error 1042 になる (https://developers.cloudflare.com/workers/observability/errors/ の 1042)
+compatibility_flags = ["global_fetch_strictly_public"]
 # https://sokudoku-extract.<account の workers.dev サブドメイン>.workers.dev で配信する
 workers_dev = true
 

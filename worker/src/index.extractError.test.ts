@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleRequest } from "./index";
+import { NOT_IN_MAINTENANCE } from "./maintenance/maintenance-state";
 
 // 極端に深い入れ子の HTML などで解析が例外になった場合を、本文の抽出を例外にして再現する
 vi.mock("./extract", () => ({
@@ -24,6 +25,7 @@ describe("handleRequest の本文の抽出の例外", () => {
         AI: { run: vi.fn() },
       },
       fetchPage,
+      async () => NOT_IN_MAINTENANCE,
     );
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual({ error: "unextractable" });
