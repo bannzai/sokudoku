@@ -13,6 +13,7 @@ function stateJSON(overrides: Record<string, unknown>) {
 }
 
 /** body を JSON で返す応答 */
+// status の既定 200 は状態を返す Worker が読めた時の status で、読めない応答を確かめる test だけが差し替える
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
@@ -39,6 +40,7 @@ describe("MaintenanceGate", () => {
     act(() => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   /** 通常の画面の代わり。押した回数を state に持ち、隠れている間も state が残るかを確かめる */
@@ -154,6 +156,17 @@ describe("MaintenanceGate", () => {
     // 時間切れは打ち切りの 2 秒 (DEFAULT_FETCH_TIMEOUT_MS) の後に起きるため、その 2 倍まで待つ
     await waitForText("通常の画面", 4000);
     expect(visibleText()).not.toContain("メンテナンス中");
+  });
+
+  it("ビルド時の NEXT_PUBLIC_MAINTENANCE_STATE_URL があれば、本番の代わりにその URL を読む", async () => {
+    vi.stubEnv("NEXT_PUBLIC_MAINTENANCE_STATE_URL", "http://127.0.0.1:8787/state");
+    vi.resetModules();
+    const { MaintenanceGate: GateWithOverride } = await import("./MaintenanceGate");
+    respond = async () => jsonResponse(stateJSON({}));
+    await act(async () => root.render(<GateWithOverride><NormalScreen /></GateWithOverride>));
+    await waitForText("メンテナンス中");
+    expect(fetchState).toHaveBeenCalledWith("http://127.0.0.1:8787/state", expect.anything());
+    expect(fetchState).not.toHaveBeenCalledWith(productionStateURL, expect.anything());
   });
 
   it("最初の読み取りで状態を読めない時は、通常の画面のまま動かす", async () => {

@@ -369,6 +369,7 @@ describe("handleRequest", () => {
 
 describe("handleRequest のメンテナンス中の判定", () => {
   /** 状態を返す Worker が body を返した時の読み手。状態の解釈は本番と同じ createMaintenanceReader で行う */
+  // status の既定 200 は状態を返す Worker が読めた時の status で、読めない応答を確かめる test だけが差し替える
   function readerReturning(body: unknown, status = 200) {
     return createMaintenanceReader({
       stateURL: "https://service-maintenance.example.workers.dev/sokudoku",
@@ -378,7 +379,7 @@ describe("handleRequest のメンテナンス中の判定", () => {
   }
 
   /** 本文を区切る Workers AI の代わり。呼ばれた回数を数える */
-  function countingAi() {
+  function countingAI() {
     return vi.fn(fakeAi((paragraph) => [paragraph]));
   }
 
@@ -392,10 +393,10 @@ describe("handleRequest のメンテナンス中の判定", () => {
 
   it("メンテナンス中は 503 で断り、ページの取得も Workers AI の呼び出しもしない", async () => {
     const fetchPage = articleFetch();
-    const runAi = countingAi();
+    const runAI = countingAI();
     const response = await handleRequest(
       extractRequest("https://example.com/article"),
-      fakeEnv(Number.POSITIVE_INFINITY, runAi),
+      fakeEnv(Number.POSITIVE_INFINITY, runAI),
       fetchPage,
       readerReturning({ maintenance: true, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z" }),
     );
@@ -405,22 +406,22 @@ describe("handleRequest のメンテナンス中の判定", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ error: "maintenance", maintenance: { maintenance: true } });
     expect(fetchPage).not.toHaveBeenCalled();
-    expect(runAi).not.toHaveBeenCalled();
+    expect(runAI).not.toHaveBeenCalled();
   });
 
   it("利用量で切り替わった (source: usage) メンテナンス中も 503 で断る", async () => {
-    const runAi = countingAi();
+    const runAI = countingAI();
     expect(
       (
         await handleRequest(
           extractRequest("https://example.com/article"),
-          fakeEnv(Number.POSITIVE_INFINITY, runAi),
+          fakeEnv(Number.POSITIVE_INFINITY, runAI),
           articleFetch(),
           readerReturning({ maintenance: true, message: null, button: null, source: "usage", changedAt: "2026-11-27T00:00:00.000Z" }),
         )
       ).status,
     ).toBe(503);
-    expect(runAi).not.toHaveBeenCalled();
+    expect(runAI).not.toHaveBeenCalled();
   });
 
   it("メンテナンス中も preflight (OPTIONS) には 503 ではなく 204 を返す", async () => {
@@ -435,7 +436,7 @@ describe("handleRequest のメンテナンス中の判定", () => {
       (
         await handleRequest(
           extractRequest("https://example.com/article", { method: "OPTIONS" }),
-          fakeEnv(Number.POSITIVE_INFINITY, countingAi()),
+          fakeEnv(Number.POSITIVE_INFINITY, countingAI()),
           articleFetch(),
           readMaintenanceState,
         )
@@ -452,28 +453,28 @@ describe("handleRequest のメンテナンス中の判定", () => {
     );
     vi.stubGlobal("fetch", globalFetch);
     try {
-      const runAi = countingAi();
-      expect((await worker.fetch(extractRequest("https://example.com/article"), fakeEnv(Number.POSITIVE_INFINITY, runAi))).status).toBe(503);
+      const runAI = countingAI();
+      expect((await worker.fetch(extractRequest("https://example.com/article"), fakeEnv(Number.POSITIVE_INFINITY, runAI))).status).toBe(503);
       expect(globalFetch).toHaveBeenCalledWith("https://service-maintenance.star-kojiki.workers.dev/sokudoku", expect.anything());
-      expect(runAi).not.toHaveBeenCalled();
+      expect(runAI).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
   it("通常に戻った (maintenance: false) 時は本文を取り出し、Workers AI に区切らせる", async () => {
-    const runAi = countingAi();
+    const runAI = countingAI();
     expect(
       (
         await handleRequest(
           extractRequest("https://example.com/article"),
-          fakeEnv(Number.POSITIVE_INFINITY, runAi),
+          fakeEnv(Number.POSITIVE_INFINITY, runAI),
           articleFetch(),
           readerReturning({ maintenance: false, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z" }),
         )
       ).status,
     ).toBe(200);
-    expect(runAi).toHaveBeenCalled();
+    expect(runAI).toHaveBeenCalled();
   });
 
   it.each([
@@ -482,18 +483,18 @@ describe("handleRequest のメンテナンス中の判定", () => {
     ["500 の応答", readerReturning({ error: "unavailable" }, 500)],
     ["形の違う応答", readerReturning({ maintenance: "true" })],
   ])("状態を読めない時 (%s) は通常どおり本文を取り出す", async (_name, readMaintenanceState) => {
-    const runAi = countingAi();
+    const runAI = countingAI();
     expect(
       (
         await handleRequest(
           extractRequest("https://example.com/article"),
-          fakeEnv(Number.POSITIVE_INFINITY, runAi),
+          fakeEnv(Number.POSITIVE_INFINITY, runAI),
           articleFetch(),
           readMaintenanceState,
         )
       ).status,
     ).toBe(200);
-    expect(runAi).toHaveBeenCalled();
+    expect(runAI).toHaveBeenCalled();
   });
 });
 
