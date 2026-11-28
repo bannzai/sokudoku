@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useEffect } from "react";
+import { act, StrictMode, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MaintenanceResolver } from "./MaintenanceResolver";
@@ -12,7 +12,10 @@ function stateJSON(overrides: Record<string, unknown>) {
   return { maintenance: true, message: null, button: null, source: "owner", changedAt: "2026-11-27T00:00:00.000Z", ...overrides };
 }
 
-// status の既定 200 は状態を返す Worker が読めた時の status で、読めない応答を確かめる test だけが差し替える
+/**
+ * body を JSON にした応答を返す。status の既定 200 は状態を返す Worker が読めた時の status で、
+ * 読めない応答を確かめる test だけが差し替える
+ */
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
@@ -78,7 +81,8 @@ describe("MaintenanceResolver", () => {
     expect(container.textContent).toContain("しばらくしてからもう一度開いてください");
     expect(container.textContent).not.toContain("通常の画面");
     expect(normalScreenMounts).toBe(0);
-    expect(container.querySelector("main a")).toBeNull();
+    // button が null の時は、ボタンも AppBar のトップページへのリンクも出さない (メンテナンス中は同じ画面に戻るだけのため)
+    expect(container.querySelector("a")).toBeNull();
     expect(fetchState).toHaveBeenCalledWith(productionStateURL, expect.anything());
   });
 
@@ -128,6 +132,28 @@ describe("MaintenanceResolver", () => {
     await waitForText("通常の画面", 4000);
     expect(container.textContent).not.toContain("メンテナンス中");
     expect(normalScreenMounts).toBe(1);
+  });
+
+  it("StrictMode が effect を 2 回動かした時は、先に破棄された回の結果で画面を決めない", async () => {
+    // 1 回目 (破棄される回) は maintenance: true を返し、2 回目より後に解決させる
+    const resolvers: Array<(response: Response) => void> = [];
+    respond = () => new Promise<Response>((resolve) => resolvers.push(resolve));
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <MaintenanceResolver>
+            <NormalScreen />
+          </MaintenanceResolver>
+        </StrictMode>,
+      ),
+    );
+    expect(resolvers).toHaveLength(2);
+    await act(async () => resolvers[1](jsonResponse(stateJSON({ maintenance: false }))));
+    await waitForText("通常の画面");
+    await act(async () => resolvers[0](jsonResponse(stateJSON({}))));
+    await act(async () => {});
+    expect(container.textContent).toContain("通常の画面");
+    expect(container.textContent).not.toContain("メンテナンス中");
   });
 
   it("タブを背面・前面に切り替えても、時間が進んでも、状態の読み取りは 1 回のまま", async () => {

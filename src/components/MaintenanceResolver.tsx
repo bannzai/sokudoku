@@ -29,8 +29,8 @@ export function MaintenanceResolver({ children }: { children: ReactNode }) {
   useEffect(() => {
     // 開発時の StrictMode が effect を 2 回動かした時に、先に破棄された回の結果で画面を決めないため
     let discarded = false;
-    void fetchMaintenanceState(maintenanceStateURL).then((read) => {
-      if (!discarded) setState(read);
+    void fetchMaintenanceState(maintenanceStateURL).then((maintenanceState) => {
+      if (!discarded) setState(maintenanceState);
     });
     return () => {
       discarded = true;
