@@ -1,11 +1,10 @@
 "use client";
 
-import { Activity, type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { AppBar } from "@/components/AppBar";
-import { type MaintenanceState, NOT_IN_MAINTENANCE } from "@/lib/maintenance/maintenance-state";
-import { watchMaintenanceState } from "@/lib/maintenance/web-maintenance-gate";
+import { fetchMaintenanceState, type MaintenanceState } from "@/lib/maintenance/maintenance-state";
 import buttonStyles from "./Button.module.css";
-import styles from "./MaintenanceGate.module.css";
+import styles from "./MaintenanceResolver.module.css";
 
 /**
  * このサービスがメンテナンス中かを返す状態の URL。owner が service-maintenance コマンド (castle の service-maintenance-setup skill) で切り替える。
@@ -19,20 +18,28 @@ const maintenanceStateURL =
 const defaultMaintenanceMessage = "しばらくしてからもう一度開いてください";
 
 /**
- * 状態を読み続け、メンテナンス中の間は children (通常の画面) を隠してメンテナンス中の画面を出す。
- * children は Activity の hidden で隠し、state (開いた本文・入力中の文) を残したまま effect (再生のタイマー等) を止める。
- * 本文は保存しないため (AGENTS.md の不変条件)、unmount すると通常に戻った時に読んでいた本文を失うため。
- * 状態を読めない時は通常の画面のまま動かす (watchMaintenanceState が「メンテナンス中でない」状態を渡す)
+ * ページの一番上に置き、ページの読み込み時に状態を 1 回だけ読んで、メンテナンス中ならメンテナンス中の画面だけを出し、
+ * children (本来の画面) を作らない。メンテナンス中でない時と状態を読めない時は children を出す。
+ * 読み終わるまで (長くても応答を待つ上限の 2 秒) は何も出さない。本来の画面を先に出すと、メンテナンス中の時に一瞬見えて処理も始まるため。
+ * タブが前面に戻った時と時間の経過では読み直さないため、開いたままのページは読み込み直すまで切り替わらない
+ * (castle の service-maintenance-setup skill の SKILL.md「読む間隔と待つ上限」。owner の決定)
  */
-export function MaintenanceGate({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<MaintenanceState>(NOT_IN_MAINTENANCE);
-  useEffect(() => watchMaintenanceState({ stateURL: maintenanceStateURL, onState: setState }), []);
-  return (
-    <>
-      <Activity mode={state.maintenance ? "hidden" : "visible"}>{children}</Activity>
-      {state.maintenance && <MaintenanceScreen state={state} />}
-    </>
-  );
+export function MaintenanceResolver({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<MaintenanceState | null>(null);
+  useEffect(() => {
+    // 開発時の StrictMode が effect を 2 回動かした時に、先に破棄された回の結果で画面を決めないため
+    let discarded = false;
+    void fetchMaintenanceState(maintenanceStateURL).then((read) => {
+      if (!discarded) setState(read);
+    });
+    return () => {
+      discarded = true;
+    };
+  }, []);
+  if (state === null) {
+    return null;
+  }
+  return state.maintenance ? <MaintenanceScreen state={state} /> : children;
 }
 
 /** メンテナンス中の画面。state の message と button を出し、message が null の時は既定の文を出す */
