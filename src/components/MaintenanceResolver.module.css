@@ -1,0 +1,17 @@
+/* 余白と文字の大きさは取り込みの画面 (Reader.module.css の .importPage・.title) とそろえる */
+.page {
+  display: grid;
+  gap: 24px;
+  justify-items: start;
+  padding-block: 8px 48px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.message {
+  margin: 0;
+  color: var(--color-muted);
+}

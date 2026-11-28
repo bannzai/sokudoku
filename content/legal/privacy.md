@@ -32,6 +32,13 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 - 取得できるのは、ログインせずに誰でも閲覧できるページに限られます
 - 取得サーバーは、取り出した本文を表示の単位に区切るため、Cloudflare, Inc. の Cloudflare Workers AI（生成 AI のモデルを実行するサービス）へ本文の段落を渡し、区切りの位置をユーザーのブラウザへ返します。Cloudflare Workers AI へ渡すのは、その URL のページから取り出した本文に限られ、ユーザーが貼り付けた文章や読み込んだファイルの本文は渡しません。取得サーバーのプログラムは、渡した本文および区切りの結果を保存せず、ログにも記録しません（Cloudflare Workers AI における取扱いは、Cloudflare, Inc. のプライバシーポリシーによります）
 
+### メンテナンス中かどうかの確認
+<!-- source: src/components/MaintenanceResolver.tsx: トップページ (リーダー) の読み込み時に 1 回だけ、https://service-maintenance.star-kojiki.workers.dev/sokudoku へ本文を含まない GET を送る。返す内容は src/lib/maintenance/maintenance-state.ts の MaintenanceState (maintenance・message・button・source・changedAt) で、2026-11-27 に GET の応答を実測して確かめた -->
+Web 版は、本サービスがメンテナンス中かどうかを確認するため、リーダーの画面を開いた時に 1 回、提供者が Cloudflare, Inc. の Cloudflare Workers 上で公開している、本サービスの稼働の状態を返す配信先（以下「状態の配信先」といいます。）に問い合わせます。メンテナンス中の時は、リーダーの代わりにメンテナンス中である旨を表示します。
+
+- 状態の配信先へ送信されるのは、通信に伴う IP アドレス等の情報です。読込テキスト、読書の位置その他のユーザーの端末に保存する情報は送信されません
+- 状態の配信先がリーダーに返すのは、すべての利用者に同じ、本サービスがメンテナンス中かどうかと表示する文言だけです（通信の処理に伴い Cloudflare, Inc. が記録する情報の取扱いは、同社のプライバシーポリシーによります）
+
 ### ユーザーの端末に保存する情報
 本サービスは、以下の情報を、ユーザーの端末のブラウザのストレージ（localStorage）に保存します。これらの情報はユーザーの端末にのみ保存され、提供者へ送信されません。
 
@@ -88,7 +95,7 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 |---|---|---|
 | GitHub, Inc.（GitHub Pages） | サイトの配信 | https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement |
 | Cloudflare, Inc.（Cloudflare Web Analytics） | アクセス解析 | https://www.cloudflare.com/privacypolicy/ |
-| Cloudflare, Inc.（Cloudflare Workers、Cloudflare Workers AI） | URL からの取り込み（取得サーバーの運用、Workers AI による本文の区切り） | https://www.cloudflare.com/privacypolicy/ |
+| Cloudflare, Inc.（Cloudflare Workers、Cloudflare Workers AI） | URL からの取り込み（取得サーバーの運用、Workers AI による本文の区切り）、メンテナンス中かどうかの確認（状態の配信先の運用） | https://www.cloudflare.com/privacypolicy/ |
 | Google LLC（Google Chrome の Translator API） | 英文の日本語訳（ユーザーの端末上で実行） | https://policies.google.com/privacy |
 | Apple Inc.（App Store・App Store Connect） | iOS アプリの配信、ならびにユーザーが共有を許可した場合のクラッシュの情報とアプリの使用状況の統計の受け取り | https://www.apple.com/legal/privacy/data/ja/app-analytics/ |
 
@@ -124,3 +131,5 @@ bannzai（以下「提供者」といいます。）は、提供者の提供す�
 【2026年10月5日改定】
 
 【2026年10月25日改定】
+
+【2026年11月27日改定】

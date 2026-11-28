@@ -1,4 +1,6 @@
 import { extractArticle } from "./extract";
+import { maintenanceResponse } from "./maintenance/cloudflare-workers-maintenance-guard";
+import { createMaintenanceReader, type MaintenanceState } from "./maintenance/maintenance-state";
 import { isAllowedByRobots } from "./robots";
 import { type Ai, segmentationTargets, segmentParagraphs } from "./segment";
 import { checkTargetUrl } from "./targetUrl";
@@ -73,10 +75,19 @@ class ExtractFailure extends Error {
   }
 }
 
+/**
+ * このサービスがメンテナンス中かを読む読み手。owner が service-maintenance コマンド (castle の service-maintenance-setup skill) で切り替える状態を、
+ * インスタンスごとに maintenance-state.ts の DEFAULT_SERVER_CACHE_MS の間覚える。Workers ではあるリクエストが始めた読み取りを別のリクエストに待たせないため shareConcurrentReads を false にする
+ */
+const readMaintenanceState = createMaintenanceReader({
+  stateURL: "https://service-maintenance.star-kojiki.workers.dev/sokudoku",
+  shareConcurrentReads: false,
+});
+
 /** Workers が呼ぶ入口。取得には Workers の fetch を使う */
 const worker = {
   fetch(request: Request, env: Env): Promise<Response> {
-    return handleRequest(request, env, fetch);
+    return handleRequest(request, env, fetch, readMaintenanceState);
   },
 };
 
@@ -85,9 +96,15 @@ export default worker;
 /**
  * GET /extract?url=<URL> を受け、公開ページの本文を JSON ({ title, text, units, siteName?, lang? }) で返す。失敗は { error } と 4xx・5xx で返す。
  * units は text を空行で区切った段落ごとの、Workers AI に区切らせた位置 (ParagraphBoundaries。documents/adr/0005-llm-segmentation-for-url-import.md)。
- * 取得した URL・本文・LLM の応答はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)
+ * 取得した URL・本文・LLM の応答はログ・キャッシュ・保存のどこにも残さない。fetchPage はページと robots.txt の取得に使う (test で差し替える)。
+ * readMaintenanceState はこのサービスがメンテナンス中かを返し (test で差し替える)、メンテナンス中は 503 で断る
  */
-export async function handleRequest(request: Request, env: Env, fetchPage: typeof fetch): Promise<Response> {
+export async function handleRequest(
+  request: Request,
+  env: Env,
+  fetchPage: typeof fetch,
+  readMaintenanceState: () => Promise<MaintenanceState>,
+): Promise<Response> {
   const origin = request.headers.get("Origin");
   if (origin !== null && !allowedOrigins.has(origin)) {
     return errorResponse("forbidden-origin", null);
@@ -101,6 +118,12 @@ export async function handleRequest(request: Request, env: Env, fetchPage: typeo
   }
   if (request.method !== "GET") {
     return errorResponse("method-not-allowed", origin);
+  }
+  // メンテナンス中は、ページの取得と Workers AI (費用のかかる処理) の呼び出しの前に断る
+  const maintenanceBlocked = await maintenanceResponse(readMaintenanceState);
+  if (maintenanceBlocked !== null) {
+    // ほかのエラーの応答と同じ CORS のヘッダーを付け、フロントが 503 と body の maintenance を読めるようにする
+    return new Response(maintenanceBlocked.body, { status: maintenanceBlocked.status, headers: responseHeaders(origin) });
   }
   // 回数を数えるためだけに IP を使い、記録はしない
   const rateLimitKey = rateLimitKeyForIp(request.headers.get("CF-Connecting-IP"));
